@@ -9,11 +9,11 @@
 function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["ID", "Sana", "Ism", "Telefon", "Ingliz tili", "Telegram", "Telegram ID", "Manba"]);
+    sheet.appendRow(["ID", "Sana", "Ism", "Familiya", "Telefon", "Viloyat", "Ingliz tili", "Telegram", "Telegram ID", "Manba"]);
   }
   var d = JSON.parse(e.postData.contents);
   sheet.appendRow([
-    d.id, d.created_at, d.full_name, "'" + d.phone, d.level,
+    d.id, d.created_at, d.first_name, d.last_name, "'" + d.phone, d.region, d.level,
     d.username ? "@" + d.username : "", d.tg_id, d.source || ""
   ]);
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))

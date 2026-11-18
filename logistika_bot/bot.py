@@ -32,6 +32,8 @@ ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split("
 SHEETS_WEBHOOK_URL = os.getenv("SHEETS_WEBHOOK_URL", "").strip()
 CRM_WEBHOOK_URL = os.getenv("CRM_WEBHOOK_URL", "").strip()
 CRM_API_KEY = os.getenv("CRM_API_KEY", "").strip()
+# Kalit qaysi sarlavhada yuboriladi. "Authorization" bo'lsa — "Bearer <kalit>", boshqa bo'lsa — kalitning o'zi.
+CRM_AUTH_HEADER = os.getenv("CRM_AUTH_HEADER", "Authorization").strip() or "Authorization"
 DB_PATH = os.getenv("DB_PATH", "leads.db")
 API_BASE = os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")
 
@@ -41,10 +43,16 @@ LEVELS = {
     "2": "Yaxshi (B2)",
     "3": "Juda yaxshi (C1–C2)",
 }
+REGIONS = [
+    "Toshkent shahri", "Toshkent viloyati", "Andijon", "Buxoro", "Farg'ona", "Jizzax",
+    "Xorazm", "Namangan", "Navoiy", "Qashqadaryo", "Qoraqalpog'iston", "Samarqand",
+    "Sirdaryo", "Surxondaryo", "Boshqa davlat",
+]
 
 log = logging.getLogger("logistika_bot")
 
-# Foydalanuvchi qaysi savolda turgani: {user_id: {"step": "name"|"phone"|"level", ...}}
+# Foydalanuvchi qaysi savolda turgani:
+# {user_id: {"step": "first_name"|"last_name"|"phone"|"region"|"level", ...}}
 STATE: dict[int, dict] = {}
 
 
@@ -86,6 +94,10 @@ PHONE_KB = {
     "one_time_keyboard": True,
 }
 LEVEL_KB = {"inline_keyboard": [[{"text": v, "callback_data": f"lvl:{k}"}] for k, v in LEVELS.items()]}
+REGION_KB = {"inline_keyboard": [
+    [{"text": r, "callback_data": f"reg:{i + j}"} for j, r in enumerate(REGIONS[i:i + 2])]
+    for i in range(0, len(REGIONS), 2)
+]}
 
 
 # ───────────────────────── Database ─────────────────────────
@@ -105,16 +117,22 @@ async def init_db():
             )
             """
         )
+        # Eski bazaga yangi ustunlarni qo'shish.
+        cur = await db.execute("PRAGMA table_info(leads)")
+        cols = {row[1] for row in await cur.fetchall()}
+        for col in ("first_name", "last_name", "region"):
+            if col not in cols:
+                await db.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT DEFAULT ''")
         await db.commit()
 
 
 async def save_lead(lead: dict) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO leads(tg_id, username, full_name, phone, level, source, created_at)"
-            " VALUES(?,?,?,?,?,?,?)",
-            (lead["tg_id"], lead["username"], lead["full_name"], lead["phone"],
-             lead["level"], lead["source"], lead["created_at"]),
+            "INSERT INTO leads(tg_id, username, full_name, first_name, last_name, phone, region,"
+            " level, source, created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (lead["tg_id"], lead["username"], lead["full_name"], lead["first_name"], lead["last_name"],
+             lead["phone"], lead["region"], lead["level"], lead["source"], lead["created_at"]),
         )
         await db.commit()
         return cur.lastrowid
@@ -135,6 +153,34 @@ async def post_json(session: aiohttp.ClientSession, url: str, payload: dict, hea
             raise RuntimeError(f"HTTP {r.status}: {(await r.text())[:200]}")
 
 
+def fieldy_payload(lead: dict) -> dict:
+    """Fieldy CRM kutadigan formatdagi kontakt."""
+    notes = (f"Ingliz tili: {lead['level']}\n"
+             f"Telegram ID: {lead['tg_id']}\n"
+             f"Zayavka #{lead['id']} ({lead['created_at']})")
+    p = {
+        "firstName": lead["first_name"],
+        "lastName": lead["last_name"],
+        "phone": lead["phone"],
+        "source": "TELEGRAM",
+        "sourceDetail": lead["source"] or "Telegram bot",
+        "region": lead["region"],
+        "telegram": f"@{lead['username']}" if lead["username"] else "",
+        "notes": notes,
+    }
+    if lead["region"] == "Toshkent shahri":
+        p["city"] = "Toshkent"
+    return {k: v for k, v in p.items() if v}
+
+
+def crm_headers() -> dict:
+    if not CRM_API_KEY:
+        return {}
+    if CRM_AUTH_HEADER.lower() == "authorization":
+        return {"Authorization": f"Bearer {CRM_API_KEY}"}
+    return {CRM_AUTH_HEADER: CRM_API_KEY}
+
+
 async def deliver(tg: TG, lead: dict) -> None:
     """Zayavkani Google Sheets / CRM ga va adminlar chatiga yuboradi."""
     uname = f"@{lead['username']}" if lead["username"] else "—"
@@ -142,6 +188,7 @@ async def deliver(tg: TG, lead: dict) -> None:
         f"🆕 <b>Yangi zayavka #{lead['id']}</b>\n\n"
         f"👤 Ism: <b>{html.escape(lead['full_name'])}</b>\n"
         f"📞 Telefon: <code>{html.escape(lead['phone'])}</code>\n"
+        f"🗺 Viloyat: {html.escape(lead['region'])}\n"
         f"🇬🇧 Ingliz tili: {html.escape(lead['level'])}\n"
         f"💬 Telegram: {html.escape(uname)} (<a href=\"tg://user?id={lead['tg_id']}\">profil</a>)\n"
         f"📍 Manba: {html.escape(lead['source'] or '—')}\n"
@@ -150,13 +197,12 @@ async def deliver(tg: TG, lead: dict) -> None:
     errors = []
     targets = []
     if SHEETS_WEBHOOK_URL:
-        targets.append(("Google Sheets", SHEETS_WEBHOOK_URL, {}))
+        targets.append(("Google Sheets", SHEETS_WEBHOOK_URL, lead, {}))
     if CRM_WEBHOOK_URL:
-        targets.append(("CRM", CRM_WEBHOOK_URL,
-                        {"Authorization": f"Bearer {CRM_API_KEY}"} if CRM_API_KEY else {}))
-    for name, url, headers in targets:
+        targets.append(("CRM", CRM_WEBHOOK_URL, fieldy_payload(lead), crm_headers()))
+    for name, url, payload, headers in targets:
         try:
-            await post_json(tg.s, url, lead, headers)
+            await post_json(tg.s, url, payload, headers)
         except Exception as e:  # noqa: BLE001
             log.exception("%s ga yuborib bo'lmadi", name)
             errors.append(f"{name}: {e}")
@@ -196,13 +242,13 @@ async def on_message(tg: TG, m: dict):
         return
 
     if cmd == "/start":
-        STATE[uid] = {"step": "name", "source": re.sub(r"[^\w-]", "", arg)[:64]}
+        STATE[uid] = {"step": "first_name", "source": re.sub(r"[^\w-]", "", arg)[:64]}
         await tg.send(
             chat_id,
             "Assalomu alaykum! 👋\n\n"
             "<b>Amanah Logistics Academy</b>ning onlayn logistika kursiga ro'yxatdan o'tish uchun "
-            "3 ta qisqa savolga javob bering. Mutaxassislarimiz siz bilan tez orada bog'lanishadi.\n\n"
-            "1️⃣ Ism va familiyangizni yozing:",
+            "bir nechta qisqa savolga javob bering. Mutaxassislarimiz siz bilan tez orada bog'lanishadi.\n\n"
+            "1️⃣ Ismingizni yozing:",
             REMOVE_KB,
         )
         return
@@ -212,15 +258,30 @@ async def on_message(tg: TG, m: dict):
         await tg.send(chat_id, "Ro'yxatdan o'tish uchun /start ni bosing.")
         return
 
-    if st["step"] == "name":
-        name = " ".join(text.split())
-        if not (2 <= len(name) <= 60) or name.startswith("/"):
-            await tg.send(chat_id, "Iltimos, ism va familiyangizni to'g'ri yozing (masalan: Aziz Karimov).")
+    if st["step"] in ("first_name", "last_name"):
+        word = " ".join(text.split())
+        if not (2 <= len(word) <= 40) or word.startswith("/") or any(c.isdigit() for c in word):
+            what = "ismingizni (masalan: Aziz)" if st["step"] == "first_name" else "familiyangizni (masalan: Karimov)"
+            await tg.send(chat_id, f"Iltimos, {what} to'g'ri yozing.")
             return
-        st.update(full_name=name, step="phone")
+        if st["step"] == "first_name" and " " in word:  # "Aziz Karimov" deb birdaniga yozsa
+            first, last = word.split(" ", 1)
+            st.update(first_name=first, last_name=last, step="phone")
+            await tg.send(
+                chat_id,
+                "3️⃣ Telefon raqamingizni yuboring — pastdagi <b>📱 Raqamni yuborish</b> tugmasini bosing "
+                "yoki qo'lda yozing (masalan: +998901234567).",
+                PHONE_KB,
+            )
+            return
+        if st["step"] == "first_name":
+            st.update(first_name=word, step="last_name")
+            await tg.send(chat_id, "2️⃣ Familiyangizni yozing:")
+            return
+        st.update(last_name=word, step="phone")
         await tg.send(
             chat_id,
-            "2️⃣ Telefon raqamingizni yuboring — pastdagi <b>📱 Raqamni yuborish</b> tugmasini bosing "
+            "3️⃣ Telefon raqamingizni yuboring — pastdagi <b>📱 Raqamni yuborish</b> tugmasini bosing "
             "yoki qo'lda yozing (masalan: +998901234567).",
             PHONE_KB,
         )
@@ -232,11 +293,24 @@ async def on_message(tg: TG, m: dict):
         if not (10 <= len(digits) <= 15):
             await tg.send(chat_id, "Raqam noto'g'ri ko'rinadi. Iltimos, qaytadan yuboring (masalan: +998901234567).")
             return
-        st.update(phone="+" + digits, step="level")
+        st.update(phone="+" + digits, step="region")
         await tg.send(chat_id, "✅ Raqam qabul qilindi.", REMOVE_KB)
-        await tg.send(chat_id, "3️⃣ Ingliz tilini qay darajada bilasiz?", LEVEL_KB)
+        await tg.send(chat_id, "4️⃣ Qaysi viloyatda yashaysiz?", REGION_KB)
+    elif st["step"] == "region":
+        await tg.send(chat_id, "Iltimos, yuqoridagi tugmalardan birini tanlang 👆", REGION_KB)
     elif st["step"] == "level":
         await tg.send(chat_id, "Iltimos, yuqoridagi tugmalardan birini tanlang 👆", LEVEL_KB)
+
+
+async def mark_chosen(tg: TG, msg: dict, text: str):
+    """Tugmali xabarni tanlangan javob bilan almashtiradi (tugmalar yo'qoladi)."""
+    if not msg:
+        return
+    try:
+        await tg.call("editMessageText", chat_id=msg["chat"]["id"], message_id=msg["message_id"],
+                      text=text, parse_mode="HTML")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def on_callback(tg: TG, cb: dict):
@@ -245,29 +319,35 @@ async def on_callback(tg: TG, cb: dict):
     msg = cb.get("message") or {}
     data = cb.get("data") or ""
     st = STATE.get(uid)
-    level = LEVELS.get(data.split(":", 1)[1]) if data.startswith("lvl:") else None
+    kind, _, val = data.partition(":")
+    await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
+    chat_id = msg.get("chat", {}).get("id", uid)
+
+    if st and st.get("step") == "region" and kind == "reg" and val.isdigit() and int(val) < len(REGIONS):
+        region = REGIONS[int(val)]
+        st.update(region=region, step="level")
+        await mark_chosen(tg, msg, f"4️⃣ Viloyat: <b>{html.escape(region)}</b>")
+        await tg.send(chat_id, "5️⃣ Ingliz tilini qay darajada bilasiz?", LEVEL_KB)
+        return
+
+    level = LEVELS.get(val) if kind == "lvl" else None
     if not st or st.get("step") != "level" or not level:
-        await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
         return
     STATE.pop(uid, None)
     lead = {
         "tg_id": uid,
         "username": user.get("username") or "",
-        "full_name": st["full_name"],
+        "first_name": st["first_name"],
+        "last_name": st["last_name"],
+        "full_name": f"{st['first_name']} {st['last_name']}",
         "phone": st["phone"],
+        "region": st["region"],
         "level": level,
         "source": st.get("source", ""),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     lead["id"] = await save_lead(lead)
-    await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
-    chat_id = msg.get("chat", {}).get("id", uid)
-    if msg:
-        try:
-            await tg.call("editMessageText", chat_id=chat_id, message_id=msg["message_id"],
-                          text=f"3️⃣ Ingliz tili darajasi: <b>{html.escape(level)}</b>", parse_mode="HTML")
-        except Exception:  # noqa: BLE001
-            pass
+    await mark_chosen(tg, msg, f"5️⃣ Ingliz tili darajasi: <b>{html.escape(level)}</b>")
     await tg.send(
         chat_id,
         "🎉 <b>Rahmat! Zayavkangiz qabul qilindi.</b>\n\n"
@@ -283,9 +363,13 @@ async def export(tg: TG, chat_id: int):
         return
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["ID", "Ism", "Telefon", "Ingliz tili", "Telegram", "Telegram ID", "Manba", "Sana"])
+    w.writerow(["ID", "Ism", "Familiya", "Telefon", "Viloyat", "Ingliz tili", "Telegram", "Telegram ID",
+                "Manba", "Sana"])
     for r in rows:
-        w.writerow([r["id"], r["full_name"], r["phone"], r["level"],
+        first, last = r["first_name"], r["last_name"]
+        if not first:  # eski zayavkalar (ism-familiya birga yozilgan)
+            first, _, last = r["full_name"].partition(" ")
+        w.writerow([r["id"], first, last, r["phone"], r["region"], r["level"],
                     f"@{r['username']}" if r["username"] else "", r["tg_id"], r["source"], r["created_at"]])
     data = ("﻿" + buf.getvalue()).encode("utf-8")  # BOM — Excel o'zbek harflarini to'g'ri ochishi uchun
     await tg.send_document(chat_id, f"zayavkalar_{datetime.now():%Y%m%d}.csv", data,

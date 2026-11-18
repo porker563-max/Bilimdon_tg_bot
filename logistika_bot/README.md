@@ -1,6 +1,6 @@
 # Amanah Logistics Academy — zayavka boti
 
-Odam postdagi **"Ro'yxatdan o'tish"** linkini bosadi → bot ism, telefon va ingliz tili darajasini so'raydi →
+Odam postdagi **"Ro'yxatdan o'tish"** linkini bosadi → bot ism, familiya, telefon, viloyat va ingliz tili darajasini so'raydi →
 zayavka **Telegram guruhingizga** (va xohlasangiz **Google Sheets** ga) darhol tushadi.
 
 ## 1. Sozlash (bir marta)
@@ -33,5 +33,17 @@ qaysi post ko'proq odam olib kelganini bilasiz.
 - `/id` — chat ID ni ko'rsatadi
 
 ## CRM (Fieldy) ga ulash
-Fieldy da API/webhook manzili bo'lsa, `CRM_WEBHOOK_URL` va `CRM_API_KEY` ni to'ldirish kifoya —
-bot har bir zayavkani JSON qilib yuboradi. Fieldy kutadigan aniq format ma'lum bo'lgach moslashtiriladi.
+`.env` da `CRM_WEBHOOK_URL` (kontakt yaratish manzili) va `CRM_API_KEY` ni to'ldiring.
+Kalit `Authorization: Bearer` emas, boshqa sarlavhada yuborilsa — `CRM_AUTH_HEADER` ga o'sha nomni yozing
+(masalan `X-API-Key`).
+
+Bot Fieldy ga shunday JSON yuboradi:
+```json
+{
+  "firstName": "Aziz", "lastName": "Karimov", "phone": "+998901234567",
+  "source": "TELEGRAM", "sourceDetail": "video1", "region": "Samarqand",
+  "telegram": "@aziz", "notes": "Ingliz tili: Yaxshi (B2)\nTelegram ID: ...\nZayavka #2 (...)"
+}
+```
+Toshkent shahri tanlansa `city: "Toshkent"` ham qo'shiladi. Bo'sh maydonlar yuborilmaydi.
+Fieldy xato qaytarsa, guruhdagi zayavka xabari ostida ⚠️ bilan ko'rinadi.
