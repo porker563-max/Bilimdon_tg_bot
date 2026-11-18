@@ -1,4 +1,4 @@
-"""Amanah Logistics Academy — zayavka (ro'yxatdan o'tish) boti.
+"""World Forum Consulting — zayavka (ro'yxatdan o'tish) boti.
 
 Oqim: /start -> ism -> telefon -> ingliz tili darajasi -> zayavka saqlanadi va
   1) adminlar guruhiga / chatiga yuboriladi,
@@ -39,6 +39,7 @@ API_BASE = os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/"
 # /post buyrug'i postlarni shu kanalga joylaydi: @kanal_username yoki -100... ID. Bot kanalda admin bo'lishi kerak.
 CHANNEL_ID = os.getenv("CHANNEL_ID", "").strip()
 BUTTON_TEXT = os.getenv("BUTTON_TEXT", "📝 Ro'yxatdan o'tish").strip() or "📝 Ro'yxatdan o'tish"
+COMPANY_NAME = os.getenv("COMPANY_NAME", "World Forum Consulting").strip() or "World Forum Consulting"
 BOT_USERNAME = ""  # ishga tushganda getMe dan olinadi
 
 LEVELS = {
@@ -53,7 +54,7 @@ REGIONS = [
     "Sirdaryo", "Surxondaryo", "Boshqa davlat",
 ]
 
-log = logging.getLogger("logistika_bot")
+log = logging.getLogger("wfc_bot")
 
 # Foydalanuvchi qaysi savolda turgani:
 # {user_id: {"step": "first_name"|"last_name"|"phone"|"region"|"level", ...}}
@@ -254,7 +255,7 @@ async def on_message(tg: TG, m: dict):
         await tg.send(
             chat_id,
             "Assalomu alaykum! 👋\n\n"
-            "<b>Amanah Logistics Academy</b>ning onlayn logistika kursiga ro'yxatdan o'tish uchun "
+            f"<b>{COMPANY_NAME}</b>ga xush kelibsiz! Bepul konsultatsiyaga yozilish uchun "
             "bir nechta qisqa savolga javob bering. Mutaxassislarimiz siz bilan tez orada bog'lanishadi.\n\n"
             "1️⃣ Ismingizni yozing:",
             REMOVE_KB,
@@ -427,7 +428,7 @@ async def on_callback(tg: TG, cb: dict):
     await tg.send(
         chat_id,
         "🎉 <b>Rahmat! Zayavkangiz qabul qilindi.</b>\n\n"
-        "Mutaxassislarimiz tez orada siz bilan bog'lanib, kurs haqida batafsil ma'lumot berishadi. 📞",
+        "Mutaxassislarimiz tez orada siz bilan bog'lanib, batafsil konsultatsiya berishadi. 📞",
     )
     asyncio.create_task(deliver(tg, lead))
 

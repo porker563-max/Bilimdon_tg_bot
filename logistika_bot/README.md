@@ -1,4 +1,4 @@
-# Amanah Logistics Academy — zayavka boti
+# World Forum Consulting — zayavka boti
 
 Odam postdagi **"Ro'yxatdan o'tish"** linkini bosadi → bot ism, familiya, telefon, viloyat va ingliz tili darajasini so'raydi →
 zayavka **Telegram guruhingizga** (va xohlasangiz **Google Sheets** ga) darhol tushadi.
