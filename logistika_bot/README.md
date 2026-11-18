@@ -27,7 +27,14 @@ https://t.me/BOT_USERNAME?start=post1
 `post1` o'rniga istalgan nom qo'ying (masalan `video_noyabr`) — zayavkada **Manba** bo'lib ko'rinadi,
 qaysi post ko'proq odam olib kelganini bilasiz.
 
+## Kanalga tugmali post joylash (/post)
+1. Botni kanalingizga **admin** qilib qo'shing ("Xabar joylash" huquqi bilan).
+2. `.env` ga `CHANNEL_ID=@kanalingiz` yozing va botni qayta yoqing.
+3. Botga `/post` yozing → videoni matni bilan yuboring → manba nomini yozing (`video1`)
+   → «✅ Kanalga yuborish» ni bosing. Post kanalda «📝 Ro'yxatdan o'tish» tugmasi bilan chiqadi.
+
 ## Admin buyruqlari
+- `/post` — kanalga tugmali post joylash
 - `/stats` — jami va bugungi zayavkalar soni
 - `/export` — barcha zayavkalar CSV (Excel) faylda — CRM ga import qilish uchun
 - `/id` — chat ID ni ko'rsatadi

@@ -36,6 +36,10 @@ CRM_API_KEY = os.getenv("CRM_API_KEY", "").strip()
 CRM_AUTH_HEADER = os.getenv("CRM_AUTH_HEADER", "Authorization").strip() or "Authorization"
 DB_PATH = os.getenv("DB_PATH", "leads.db")
 API_BASE = os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")
+# /post buyrug'i postlarni shu kanalga joylaydi: @kanal_username yoki -100... ID. Bot kanalda admin bo'lishi kerak.
+CHANNEL_ID = os.getenv("CHANNEL_ID", "").strip()
+BUTTON_TEXT = os.getenv("BUTTON_TEXT", "📝 Ro'yxatdan o'tish").strip() or "📝 Ro'yxatdan o'tish"
+BOT_USERNAME = ""  # ishga tushganda getMe dan olinadi
 
 LEVELS = {
     "0": "Boshlang'ich (A1–A2)",
@@ -241,6 +245,10 @@ async def on_message(tg: TG, m: dict):
     if m["chat"].get("type") != "private":
         return
 
+    if uid in ADMIN_IDS and (cmd == "/post" or (STATE.get(uid) or {}).get("step", "").startswith("post_")):
+        await post_flow(tg, m, cmd)
+        return
+
     if cmd == "/start":
         STATE[uid] = {"step": "first_name", "source": re.sub(r"[^\w-]", "", arg)[:64]}
         await tg.send(
@@ -313,6 +321,70 @@ async def mark_chosen(tg: TG, msg: dict, text: str):
         pass
 
 
+# ───────────────────────── /post: kanalga tugmali post ─────────────────────────
+def signup_kb(source: str) -> dict:
+    url = f"https://t.me/{BOT_USERNAME}?start={source}"
+    return {"inline_keyboard": [[{"text": BUTTON_TEXT, "url": url}]]}
+
+
+async def post_flow(tg: TG, m: dict, cmd: str):
+    uid, chat_id = m["from"]["id"], m["chat"]["id"]
+    st = STATE.get(uid) or {}
+    if cmd in ("/post", "/cancel") or cmd.startswith("/"):
+        if cmd != "/post":
+            STATE.pop(uid, None)
+            await tg.send(chat_id, "Bekor qilindi.")
+            return
+        if not CHANNEL_ID:
+            await tg.send(chat_id, "⚠️ Avval .env faylida <b>CHANNEL_ID</b> ni to'ldiring "
+                                   "(masalan: CHANNEL_ID=@kanalingiz) va botni qayta yoqing.")
+            return
+        STATE[uid] = {"step": "post_wait"}
+        await tg.send(chat_id, "📤 Kanalga joylanadigan postni yuboring: video, rasm yoki matn "
+                               "(videoni tagidagi matni bilan birga).\n\nBekor qilish: /cancel")
+        return
+    if st["step"] == "post_wait":
+        st.update(step="post_source", src_chat=chat_id, src_msg=m["message_id"])
+        await tg.send(chat_id, "🏷 Manba nomini yozing — zayavkada shu nom chiqadi "
+                               "(masalan: <code>video1</code>). Faqat lotin harf, raqam, _ va -.")
+        return
+    if st["step"] == "post_source":
+        source = (m.get("text") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", source):
+            await tg.send(chat_id, "Nom noto'g'ri. Faqat lotin harf, raqam, _ va - ishlating "
+                                   "(bo'sh joysiz), masalan: <code>video_noyabr</code>")
+            return
+        st.update(step="post_confirm", source=source)
+        kb = signup_kb(source)
+        kb["inline_keyboard"].append([{"text": "✅ Kanalga yuborish", "callback_data": "pub:yes"},
+                                      {"text": "❌ Bekor qilish", "callback_data": "pub:no"}])
+        await tg.call("copyMessage", chat_id=chat_id, from_chat_id=st["src_chat"],
+                      message_id=st["src_msg"], reply_markup=kb)
+        await tg.send(chat_id, f"👆 Post kanalda shunday ko'rinadi (pastki 2 ta tugmasiz).\n"
+                               f"Kanal: <b>{html.escape(CHANNEL_ID)}</b>")
+        return
+    await tg.send(chat_id, "Yuqoridagi postdagi «✅ Kanalga yuborish» yoki «❌ Bekor qilish» ni bosing.")
+
+
+async def publish(tg: TG, uid: int, chat_id: int, val: str):
+    st = STATE.get(uid) or {}
+    if st.get("step") != "post_confirm":
+        return
+    STATE.pop(uid, None)
+    if val != "yes":
+        await tg.send(chat_id, "Bekor qilindi.")
+        return
+    try:
+        await tg.call("copyMessage", chat_id=CHANNEL_ID, from_chat_id=st["src_chat"],
+                      message_id=st["src_msg"], reply_markup=signup_kb(st["source"]))
+    except Exception as e:  # noqa: BLE001
+        await tg.send(chat_id, "❌ Kanalga yuborib bo'lmadi: " + html.escape(str(e)) +
+                      "\n\nBot kanalda <b>admin</b> ekanini va unga «Xabar joylash» huquqi berilganini, "
+                      "CHANNEL_ID to'g'ri yozilganini tekshiring.")
+        return
+    await tg.send(chat_id, f"✅ Post kanalga joylandi! Manba: <b>{html.escape(st['source'])}</b>")
+
+
 async def on_callback(tg: TG, cb: dict):
     user = cb["from"]
     uid = user["id"]
@@ -322,6 +394,10 @@ async def on_callback(tg: TG, cb: dict):
     kind, _, val = data.partition(":")
     await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
     chat_id = msg.get("chat", {}).get("id", uid)
+
+    if kind == "pub" and uid in ADMIN_IDS:
+        await publish(tg, uid, chat_id, val)
+        return
 
     if st and st.get("step") == "region" and kind == "reg" and val.isdigit() and int(val) < len(REGIONS):
         region = REGIONS[int(val)]
@@ -397,6 +473,8 @@ async def main():
     async with aiohttp.ClientSession() as session:
         tg = TG(session, BOT_TOKEN)
         me = await tg.call("getMe")
+        global BOT_USERNAME
+        BOT_USERNAME = me["username"]
         await tg.call("deleteWebhook")
         log.info("Bot ishga tushdi: @%s — to'xtatish uchun Ctrl+C", me["username"])
         offset = 0
