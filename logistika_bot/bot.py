@@ -4,39 +4,27 @@ Oqim: /start -> ism -> telefon -> ingliz tili darajasi -> zayavka saqlanadi va
   1) adminlar guruhiga / chatiga yuboriladi,
   2) (ixtiyoriy) Google Sheets jadvaliga yoziladi,
   3) (ixtiyoriy) CRM webhook manziliga JSON qilib yuboriladi (Fieldy va h.k.).
+
+Telefonda (Termux) oson o'rnatilishi uchun og'ir kutubxonalarsiz yozilgan:
+faqat aiohttp, aiosqlite va python-dotenv kerak.
 """
 import asyncio
 import csv
 import html
 import io
+import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 
 import aiohttp
 import aiosqlite
-from aiogram import Bot, Dispatcher, F, Router
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandObject, CommandStart
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import (
-    BufferedInputFile,
-    CallbackQuery,
-    KeyboardButton,
-    Message,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-)
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 # Zayavkalar yuboriladigan chat(lar): guruh ID (-100...) yoki shaxsiy ID. Vergul bilan bir nechta.
 LEADS_CHAT_IDS = [int(x) for x in os.getenv("LEADS_CHAT_IDS", "").replace(" ", "").split(",") if x]
 # /export va /stats buyruqlarini ishlata oladigan odamlar ID lari.
@@ -45,6 +33,7 @@ SHEETS_WEBHOOK_URL = os.getenv("SHEETS_WEBHOOK_URL", "").strip()
 CRM_WEBHOOK_URL = os.getenv("CRM_WEBHOOK_URL", "").strip()
 CRM_API_KEY = os.getenv("CRM_API_KEY", "").strip()
 DB_PATH = os.getenv("DB_PATH", "leads.db")
+API_BASE = os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")
 
 LEVELS = {
     "0": "Boshlang'ich (A1–A2)",
@@ -53,14 +42,50 @@ LEVELS = {
     "3": "Juda yaxshi (C1–C2)",
 }
 
-router = Router()
 log = logging.getLogger("logistika_bot")
 
+# Foydalanuvchi qaysi savolda turgani: {user_id: {"step": "name"|"phone"|"level", ...}}
+STATE: dict[int, dict] = {}
 
-class Form(StatesGroup):
-    name = State()
-    phone = State()
-    level = State()
+
+# ───────────────────────── Telegram API ─────────────────────────
+class TG:
+    def __init__(self, session: aiohttp.ClientSession, token: str):
+        self.s = session
+        self.url = f"{API_BASE}/bot{token}/"
+
+    async def call(self, method: str, http_timeout: float = 30, **params):
+        payload = {k: v for k, v in params.items() if v is not None}
+        async with self.s.post(self.url + method, json=payload,
+                               timeout=aiohttp.ClientTimeout(total=http_timeout)) as r:
+            data = await r.json(content_type=None)
+        if not data.get("ok"):
+            raise RuntimeError(f"{method}: {data.get('description')}")
+        return data["result"]
+
+    async def send(self, chat_id, text, reply_markup=None):
+        return await self.call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML",
+                               disable_web_page_preview=True, reply_markup=reply_markup)
+
+    async def send_document(self, chat_id, filename: str, content: bytes, caption: str = ""):
+        form = aiohttp.FormData()
+        form.add_field("chat_id", str(chat_id))
+        form.add_field("caption", caption)
+        form.add_field("document", content, filename=filename, content_type="text/csv")
+        async with self.s.post(self.url + "sendDocument", data=form,
+                               timeout=aiohttp.ClientTimeout(total=60)) as r:
+            data = await r.json(content_type=None)
+        if not data.get("ok"):
+            raise RuntimeError(f"sendDocument: {data.get('description')}")
+
+
+REMOVE_KB = {"remove_keyboard": True}
+PHONE_KB = {
+    "keyboard": [[{"text": "📱 Raqamni yuborish", "request_contact": True}]],
+    "resize_keyboard": True,
+    "one_time_keyboard": True,
+}
+LEVEL_KB = {"inline_keyboard": [[{"text": v, "callback_data": f"lvl:{k}"}] for k, v in LEVELS.items()]}
 
 
 # ───────────────────────── Database ─────────────────────────
@@ -103,16 +128,15 @@ async def all_leads():
 
 
 # ───────────────────────── Tashqi yuborish ─────────────────────────
-async def post_json(url: str, payload: dict, headers: dict | None = None) -> None:
-    timeout = aiohttp.ClientTimeout(total=15)
-    async with aiohttp.ClientSession(timeout=timeout) as s:
-        async with s.post(url, json=payload, headers=headers or {}) as r:
-            if r.status >= 400:
-                raise RuntimeError(f"HTTP {r.status}: {(await r.text())[:200]}")
+async def post_json(session: aiohttp.ClientSession, url: str, payload: dict, headers: dict) -> None:
+    async with session.post(url, json=payload, headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=20)) as r:
+        if r.status >= 400:
+            raise RuntimeError(f"HTTP {r.status}: {(await r.text())[:200]}")
 
 
-async def deliver(bot: Bot, lead: dict) -> None:
-    """Zayavkani adminlarga, Google Sheets ga va CRM ga yuboradi. Xato bo'lsa — log + adminlarga ogohlantirish."""
+async def deliver(tg: TG, lead: dict) -> None:
+    """Zayavkani Google Sheets / CRM ga va adminlar chatiga yuboradi."""
     uname = f"@{lead['username']}" if lead["username"] else "—"
     text = (
         f"🆕 <b>Yangi zayavka #{lead['id']}</b>\n\n"
@@ -124,143 +148,138 @@ async def deliver(bot: Bot, lead: dict) -> None:
         f"🕒 {lead['created_at']}"
     )
     errors = []
-
     targets = []
     if SHEETS_WEBHOOK_URL:
         targets.append(("Google Sheets", SHEETS_WEBHOOK_URL, {}))
     if CRM_WEBHOOK_URL:
-        h = {"Authorization": f"Bearer {CRM_API_KEY}"} if CRM_API_KEY else {}
-        targets.append(("CRM", CRM_WEBHOOK_URL, h))
+        targets.append(("CRM", CRM_WEBHOOK_URL,
+                        {"Authorization": f"Bearer {CRM_API_KEY}"} if CRM_API_KEY else {}))
     for name, url, headers in targets:
         try:
-            await post_json(url, lead, headers)
+            await post_json(tg.s, url, lead, headers)
         except Exception as e:  # noqa: BLE001
             log.exception("%s ga yuborib bo'lmadi", name)
             errors.append(f"{name}: {e}")
-
     if errors:
         text += "\n\n⚠️ " + html.escape("; ".join(errors))
     for chat_id in LEADS_CHAT_IDS:
         try:
-            await bot.send_message(chat_id, text)
+            await tg.send(chat_id, text)
         except Exception:  # noqa: BLE001
             log.exception("Chat %s ga yuborib bo'lmadi", chat_id)
 
 
-# ───────────────────────── Klaviaturalar ─────────────────────────
-def phone_kb() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📱 Raqamni yuborish", request_contact=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
+# ───────────────────────── Xabarlarni qayta ishlash ─────────────────────────
+async def on_message(tg: TG, m: dict):
+    chat_id = m["chat"]["id"]
+    user = m.get("from") or {}
+    uid = user.get("id")
+    text = (m.get("text") or "").strip()
+    cmd, _, arg = text.partition(" ")
+    cmd = cmd.split("@", 1)[0].lower() if cmd.startswith("/") else ""
 
-
-def level_kb():
-    b = InlineKeyboardBuilder()
-    for key, label in LEVELS.items():
-        b.button(text=label, callback_data=f"lvl:{key}")
-    b.adjust(1)
-    return b.as_markup()
-
-
-# ───────────────────────── Foydalanuvchi oqimi ─────────────────────────
-@router.message(CommandStart())
-async def start(message: Message, command: CommandObject, state: FSMContext):
-    await state.clear()
-    await state.update_data(source=(command.args or "")[:64])
-    await message.answer(
-        "Assalomu alaykum! 👋\n\n"
-        "<b>Amanah Logistics Academy</b>ning onlayn logistika kursiga ro'yxatdan o'tish uchun "
-        "3 ta qisqa savolga javob bering. Mutaxassislarimiz siz bilan tez orada bog'lanishadi.\n\n"
-        "1️⃣ Ism va familiyangizni yozing:",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await state.set_state(Form.name)
-
-
-@router.message(Form.name, F.text)
-async def got_name(message: Message, state: FSMContext):
-    name = " ".join(message.text.split())
-    if not (2 <= len(name) <= 60) or name.startswith("/"):
-        await message.answer("Iltimos, ism va familiyangizni to'g'ri yozing (masalan: Aziz Karimov).")
+    if cmd == "/id":
+        await tg.send(chat_id, f"Chat ID: <code>{chat_id}</code>\nSizning ID: <code>{uid}</code>")
         return
-    await state.update_data(full_name=name)
-    await message.answer(
-        "2️⃣ Telefon raqamingizni yuboring — pastdagi <b>📱 Raqamni yuborish</b> tugmasini bosing "
-        "yoki qo'lda yozing (masalan: +998901234567).",
-        reply_markup=phone_kb(),
-    )
-    await state.set_state(Form.phone)
-
-
-@router.message(Form.phone, F.contact | F.text)
-async def got_phone(message: Message, state: FSMContext):
-    raw = message.contact.phone_number if message.contact else message.text
-    digits = re.sub(r"\D", "", raw or "")
-    if len(digits) == 9:  # 901234567 -> 998901234567
-        digits = "998" + digits
-    if not (10 <= len(digits) <= 15):
-        await message.answer("Raqam noto'g'ri ko'rinadi. Iltimos, qaytadan yuboring (masalan: +998901234567).")
+    if cmd == "/stats" and uid in ADMIN_IDS:
+        rows = await all_leads()
+        today = datetime.now().strftime("%Y-%m-%d")
+        n_today = sum(1 for r in rows if r["created_at"].startswith(today))
+        await tg.send(chat_id, f"📊 Jami zayavkalar: <b>{len(rows)}</b>\nBugun: <b>{n_today}</b>")
         return
-    await state.update_data(phone="+" + digits)
-    await message.answer("✅ Raqam qabul qilindi.", reply_markup=ReplyKeyboardRemove())
-    await message.answer("3️⃣ Ingliz tilini qay darajada bilasiz?", reply_markup=level_kb())
-    await state.set_state(Form.level)
-
-
-@router.message(Form.level)
-async def level_hint(message: Message):
-    await message.answer("Iltimos, yuqoridagi tugmalardan birini tanlang 👆", reply_markup=level_kb())
-
-
-@router.callback_query(Form.level, F.data.startswith("lvl:"))
-async def got_level(cb: CallbackQuery, state: FSMContext, bot: Bot):
-    level = LEVELS.get(cb.data.split(":", 1)[1])
-    if not level:
-        await cb.answer()
+    if cmd == "/export" and uid in ADMIN_IDS:
+        await export(tg, chat_id)
         return
-    data = await state.get_data()
-    await state.clear()
+
+    # Ro'yxatdan o'tish faqat shaxsiy chatda.
+    if m["chat"].get("type") != "private":
+        return
+
+    if cmd == "/start":
+        STATE[uid] = {"step": "name", "source": re.sub(r"[^\w-]", "", arg)[:64]}
+        await tg.send(
+            chat_id,
+            "Assalomu alaykum! 👋\n\n"
+            "<b>Amanah Logistics Academy</b>ning onlayn logistika kursiga ro'yxatdan o'tish uchun "
+            "3 ta qisqa savolga javob bering. Mutaxassislarimiz siz bilan tez orada bog'lanishadi.\n\n"
+            "1️⃣ Ism va familiyangizni yozing:",
+            REMOVE_KB,
+        )
+        return
+
+    st = STATE.get(uid)
+    if not st:
+        await tg.send(chat_id, "Ro'yxatdan o'tish uchun /start ni bosing.")
+        return
+
+    if st["step"] == "name":
+        name = " ".join(text.split())
+        if not (2 <= len(name) <= 60) or name.startswith("/"):
+            await tg.send(chat_id, "Iltimos, ism va familiyangizni to'g'ri yozing (masalan: Aziz Karimov).")
+            return
+        st.update(full_name=name, step="phone")
+        await tg.send(
+            chat_id,
+            "2️⃣ Telefon raqamingizni yuboring — pastdagi <b>📱 Raqamni yuborish</b> tugmasini bosing "
+            "yoki qo'lda yozing (masalan: +998901234567).",
+            PHONE_KB,
+        )
+    elif st["step"] == "phone":
+        raw = (m.get("contact") or {}).get("phone_number") or text
+        digits = re.sub(r"\D", "", raw)
+        if len(digits) == 9:  # 901234567 -> 998901234567
+            digits = "998" + digits
+        if not (10 <= len(digits) <= 15):
+            await tg.send(chat_id, "Raqam noto'g'ri ko'rinadi. Iltimos, qaytadan yuboring (masalan: +998901234567).")
+            return
+        st.update(phone="+" + digits, step="level")
+        await tg.send(chat_id, "✅ Raqam qabul qilindi.", REMOVE_KB)
+        await tg.send(chat_id, "3️⃣ Ingliz tilini qay darajada bilasiz?", LEVEL_KB)
+    elif st["step"] == "level":
+        await tg.send(chat_id, "Iltimos, yuqoridagi tugmalardan birini tanlang 👆", LEVEL_KB)
+
+
+async def on_callback(tg: TG, cb: dict):
+    user = cb["from"]
+    uid = user["id"]
+    msg = cb.get("message") or {}
+    data = cb.get("data") or ""
+    st = STATE.get(uid)
+    level = LEVELS.get(data.split(":", 1)[1]) if data.startswith("lvl:") else None
+    if not st or st.get("step") != "level" or not level:
+        await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
+        return
+    STATE.pop(uid, None)
     lead = {
-        "tg_id": cb.from_user.id,
-        "username": cb.from_user.username or "",
-        "full_name": data["full_name"],
-        "phone": data["phone"],
+        "tg_id": uid,
+        "username": user.get("username") or "",
+        "full_name": st["full_name"],
+        "phone": st["phone"],
         "level": level,
-        "source": data.get("source", ""),
-        "created_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
+        "source": st.get("source", ""),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     lead["id"] = await save_lead(lead)
-    await cb.message.edit_text(f"3️⃣ Ingliz tili darajasi: <b>{html.escape(level)}</b>")
-    await cb.message.answer(
+    await tg.call("answerCallbackQuery", callback_query_id=cb["id"])
+    chat_id = msg.get("chat", {}).get("id", uid)
+    if msg:
+        try:
+            await tg.call("editMessageText", chat_id=chat_id, message_id=msg["message_id"],
+                          text=f"3️⃣ Ingliz tili darajasi: <b>{html.escape(level)}</b>", parse_mode="HTML")
+        except Exception:  # noqa: BLE001
+            pass
+    await tg.send(
+        chat_id,
         "🎉 <b>Rahmat! Zayavkangiz qabul qilindi.</b>\n\n"
-        "Mutaxassislarimiz tez orada siz bilan bog'lanib, kurs haqida batafsil ma'lumot berishadi. 📞"
+        "Mutaxassislarimiz tez orada siz bilan bog'lanib, kurs haqida batafsil ma'lumot berishadi. 📞",
     )
-    await cb.answer()
-    asyncio.create_task(deliver(bot, lead))
+    asyncio.create_task(deliver(tg, lead))
 
 
-# ───────────────────────── Admin buyruqlari ─────────────────────────
-@router.message(Command("id"))
-async def show_id(message: Message):
-    """Guruh yoki shaxsiy chat ID sini bilish uchun (sozlashda kerak bo'ladi)."""
-    await message.answer(f"Chat ID: <code>{message.chat.id}</code>\nSizning ID: <code>{message.from_user.id}</code>")
-
-
-@router.message(Command("stats"), F.from_user.id.in_(ADMIN_IDS))
-async def stats(message: Message):
-    rows = await all_leads()
-    today = datetime.now().strftime("%Y-%m-%d")
-    n_today = sum(1 for r in rows if r["created_at"].startswith(today))
-    await message.answer(f"📊 Jami zayavkalar: <b>{len(rows)}</b>\nBugun: <b>{n_today}</b>")
-
-
-@router.message(Command("export"), F.from_user.id.in_(ADMIN_IDS))
-async def export(message: Message):
+async def export(tg: TG, chat_id: int):
     rows = await all_leads()
     if not rows:
-        await message.answer("Hali zayavka yo'q.")
+        await tg.send(chat_id, "Hali zayavka yo'q.")
         return
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -269,26 +288,51 @@ async def export(message: Message):
         w.writerow([r["id"], r["full_name"], r["phone"], r["level"],
                     f"@{r['username']}" if r["username"] else "", r["tg_id"], r["source"], r["created_at"]])
     data = ("﻿" + buf.getvalue()).encode("utf-8")  # BOM — Excel o'zbek harflarini to'g'ri ochishi uchun
-    await message.answer_document(
-        BufferedInputFile(data, filename=f"zayavkalar_{datetime.now():%Y%m%d}.csv"),
-        caption=f"📥 {len(rows)} ta zayavka. Bu faylni CRM ga import qilishingiz mumkin.",
-    )
+    await tg.send_document(chat_id, f"zayavkalar_{datetime.now():%Y%m%d}.csv", data,
+                           f"📥 {len(rows)} ta zayavka. Bu faylni CRM ga import qilishingiz mumkin.")
+
+
+async def handle(tg: TG, update: dict):
+    try:
+        if "message" in update:
+            await on_message(tg, update["message"])
+        elif "callback_query" in update:
+            await on_callback(tg, update["callback_query"])
+    except Exception:  # noqa: BLE001
+        log.exception("Update ni qayta ishlashda xato: %s", json.dumps(update)[:300])
 
 
 # ───────────────────────── Ishga tushirish ─────────────────────────
 async def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
     if not BOT_TOKEN:
         raise SystemExit("BOT_TOKEN topilmadi. .env faylini to'ldiring (.env.example ga qarang).")
     if not LEADS_CHAT_IDS:
-        log.warning("LEADS_CHAT_IDS bo'sh — zayavkalar faqat bazaga yoziladi, hech kimga yuborilmaydi.")
+        log.warning("LEADS_CHAT_IDS bo'sh — zayavkalar faqat bazaga yoziladi. Guruhda /id yozib ID ni oling.")
     await init_db()
-    bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher(storage=MemoryStorage())
-    dp.include_router(router)
-    await bot.delete_webhook(drop_pending_updates=False)
-    await dp.start_polling(bot)
+    async with aiohttp.ClientSession() as session:
+        tg = TG(session, BOT_TOKEN)
+        me = await tg.call("getMe")
+        await tg.call("deleteWebhook")
+        log.info("Bot ishga tushdi: @%s — to'xtatish uchun Ctrl+C", me["username"])
+        offset = 0
+        while True:
+            try:
+                updates = await tg.call("getUpdates", http_timeout=70, offset=offset, limit=50,
+                                        timeout=50, allowed_updates=["message", "callback_query"])
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — internet uzilsa, kutib qayta urinadi
+                log.warning("Telegram bilan aloqa yo'q (%s). 5 soniyadan keyin qayta urinaman...", e)
+                await asyncio.sleep(5)
+                continue
+            for u in updates:
+                offset = u["update_id"] + 1
+                await handle(tg, u)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nBot to'xtatildi.")
