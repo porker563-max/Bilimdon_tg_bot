@@ -1,0 +1,8 @@
+s1|Xodimlaringiz tinmay bir xil savollarga javob berishdan charchadimi?
+s2|Kompaniyangizga har kuni o'nlab mijozlar yozadi, lekin xodimlar ularga javob berishga ulgurmayapti.
+s2b|Bularning hammasiga qanday ulguraman?..
+s3|Savollarga javob kechiksa — mijoz ketadi. Har bir yo'qotilgan mijoz — bu yo'qotilgan daromad.
+s4a|Bir nechta xodimingiz o'rniga javob beradigan, hech qachon uxlamaydigan tezkor xodimni xohlaysizmi? Unda kompaniyangiz uchun Telegram botni o'rnating!
+s4b|Endi sizning kompaniyangiz yigirma to'rt soat, yetti kun ishlaydi, mijozlar esa doim mamnun! Bot siz uchun javob beradi, ma'lumot to'playdi, yangiliklarni tarqatadi va vaqtni tejaydi.
+s5a|Biz — Ay-Si-Pi Ay-Ti kompaniyasi, sizning biznesingiz uchun shaxsiy Telegram bot yaratib beramiz! Zamonaviy, tezkor va mijozlarga qulay tizim bilan siz ham bir qadam oldinda bo'ling!
+s5b|Sizda hali Telegram bot yo'qmi? Unda biz bilan hoziroq bog'laning!
