@@ -1,0 +1,574 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+:root{--blue:#1E8BFF;--sky:#4FC3FF;--deep:#0A2A66;--ink:#05070D;--ink2:#0D1320;--white:#fff;--grey:#8D97AB}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;background:#05070D;overflow:hidden}
+body{font-family:"Inter",sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#05070D}
+.abs{position:absolute}
+.layer{position:absolute;inset:0}
+.scene{position:absolute;inset:0;opacity:0}
+.c{left:50%;top:50%}
+.center{display:flex;align-items:center;justify-content:center}
+.disp{font-family:"Inter Display","Inter",sans-serif}
+/* background */
+#bgA,#bgB,#bgC{position:absolute;inset:0}
+#bgA{background:radial-gradient(1100px 900px at 50% 38%,#0B2350 0%,#060A14 55%,#030409 100%)}
+#bgB{background:radial-gradient(1200px 1000px at 50% 40%,#2F9BFF 0%,#1467E0 45%,#0A2E7A 100%);opacity:0}
+#bgC{background:linear-gradient(180deg,#F4F8FF 0%,#E3EEFF 100%);opacity:0}
+#grid{position:absolute;inset:-200px;background-image:linear-gradient(rgba(79,195,255,.07) 2px,transparent 2px),linear-gradient(90deg,rgba(79,195,255,.07) 2px,transparent 2px);background-size:90px 90px}
+.dot{position:absolute;width:10px;height:10px;border-radius:50%;background:#4FC3FF}
+/* phone */
+.phone{position:absolute;width:600px;height:1180px;border-radius:78px;background:#0B0F18;border:14px solid #1A2232;box-shadow:0 40px 120px rgba(0,0,0,.6),inset 0 0 0 3px #2A3550;overflow:hidden}
+.phone .notch{position:absolute;left:50%;top:14px;width:170px;height:40px;margin-left:-85px;border-radius:22px;background:#000;z-index:5}
+.scr{position:absolute;inset:0;overflow:hidden}
+.apphead{position:absolute;left:0;right:0;top:0;height:190px;padding:84px 34px 0;display:flex;align-items:center;gap:20px;z-index:3}
+.av{width:72px;height:72px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:30px;color:#fff}
+.msgs{position:absolute;left:0;right:0;bottom:30px;padding:0 26px;display:flex;flex-direction:column;gap:18px}
+.msg{display:flex;gap:16px;align-items:flex-end;transform-origin:left bottom}
+.bub{padding:20px 26px;border-radius:30px;font-size:33px;font-weight:600;line-height:1.25;max-width:430px}
+.in .bub{background:#1B2436;color:#fff;border-bottom-left-radius:8px}
+.out{justify-content:flex-end;transform-origin:right bottom}
+.out .bub{background:#1E8BFF;color:#fff;border-bottom-right-radius:8px}
+.name{font-size:22px;font-weight:700;color:#4FC3FF;margin-bottom:6px}
+.badge{position:absolute;min-width:110px;height:110px;padding:0 26px;border-radius:60px;background:#fff;color:#05070D;font-weight:900;font-size:56px;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 40px rgba(30,139,255,.5)}
+.fly{position:absolute;padding:20px 28px;border-radius:30px;background:#fff;color:#05070D;font-weight:800;font-size:36px;white-space:nowrap;box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;gap:14px;align-items:center}
+.fly .ic{width:46px;height:46px;border-radius:50%;background:#1E8BFF;display:flex;align-items:center;justify-content:center}
+.tag{display:inline-flex;align-items:center;gap:14px;padding:16px 30px;border-radius:50px;font-weight:800;font-size:34px;letter-spacing:.08em;text-transform:uppercase}
+.h1{font-weight:900;font-size:96px;line-height:1.02;letter-spacing:-.02em;text-align:center}
+.card{position:absolute;background:#0F1626;border:2px solid #1E2A44;border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+/* subtitles */
+#subs{position:absolute;left:60px;right:60px;top:1400px;display:flex;justify-content:center;z-index:50}
+#subbox{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px;padding:18px 34px;border-radius:30px;background:rgba(5,7,13,.78);border:2px solid rgba(79,195,255,.25);max-width:960px}
+.sw{font-weight:900;font-size:64px;line-height:1.12;color:#fff;padding:2px 12px;border-radius:16px;letter-spacing:-.01em}
+.sw.on{background:#1E8BFF;color:#fff}
+.sw.f{font-style:italic}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:60;pointer-events:none}
+#vign{position:absolute;inset:0;z-index:40;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+#wm{position:absolute;left:56px;top:70px;z-index:45;display:flex;align-items:center;gap:14px;font-weight:900;font-size:34px;letter-spacing:.04em}
+.btn{display:inline-flex;align-items:center;gap:22px;padding:34px 60px;border-radius:80px;background:#fff;color:#0A2A66;font-weight:900;font-size:52px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.feat{position:absolute;width:430px;height:330px;border-radius:44px;background:#fff;color:#05070D;padding:40px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 30px 70px rgba(5,20,60,.35)}
+.feat .fi{width:110px;height:110px;border-radius:32px;background:#1E8BFF;display:flex;align-items:center;justify-content:center}
+.feat .ft{font-weight:900;font-size:44px;line-height:1.08}
+</style></head>
+<body>
+<div id="stage">
+  <div id="bgA"></div><div id="bgB"></div><div id="bgC"></div>
+  <div id="grid"></div>
+  <div id="dots" class="layer"></div>
+
+  <!-- ================= SCENE 1: HOOK ================= -->
+  <div class="scene" id="sc1">
+    <div class="abs" id="s1tag" style="left:0;right:0;top:190px;text-align:center"><span class="tag" style="background:#fff;color:#05070D">⚠️ Tanish holatmi?</span></div>
+    <div class="phone" id="ph1" style="left:240px;top:300px;height:1060px">
+      <div class="notch"></div>
+      <div class="scr" style="background:#0B0F18">
+        <div class="apphead" style="background:linear-gradient(#111A2B,#0B0F18)">
+          <div style="font-weight:900;font-size:44px">Chatlar</div>
+          <div style="margin-left:auto;background:#1E8BFF;border-radius:30px;padding:8px 20px;font-weight:900;font-size:30px" id="ph1cnt">0</div>
+        </div>
+        <div class="msgs" id="ph1msgs"></div>
+      </div>
+    </div>
+    <div class="badge" id="b99" style="left:740px;top:300px">99+</div>
+    <div class="layer" id="flyers1"></div>
+  </div>
+
+  <!-- ================= SCENE 2: OFFICE ================= -->
+  <div class="scene" id="sc2">
+    <div class="abs" style="left:0;right:0;top:180px;text-align:center" id="s2head">
+      <div class="tag" style="background:rgba(79,195,255,.12);color:#4FC3FF;border:2px solid rgba(79,195,255,.4)">Javobsiz xabarlar</div>
+      <div class="disp" id="s2count" style="font-weight:900;font-size:170px;line-height:1;margin-top:18px">0</div>
+    </div>
+    <!-- wall clock -->
+    <div class="abs" id="clock" style="left:96px;top:520px;width:170px;height:170px;border-radius:50%;background:#0F1626;border:8px solid #fff">
+      <div class="abs" id="hh" style="left:77px;top:30px;width:10px;height:56px;background:#fff;border-radius:6px;transform-origin:5px 54px"></div>
+      <div class="abs" id="mh" style="left:79px;top:14px;width:6px;height:72px;background:#4FC3FF;border-radius:6px;transform-origin:3px 70px"></div>
+    </div>
+    <!-- incoming calls -->
+    <div class="abs" id="call" style="left:780px;top:540px;width:210px;height:210px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center">
+      <svg width="100" height="100" viewBox="0 0 24 24"><path fill="#05070D" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+      <div class="abs" id="callring1" style="inset:-20px;border-radius:50%;border:6px solid #4FC3FF"></div>
+      <div class="abs" id="callring2" style="inset:-20px;border-radius:50%;border:6px solid #4FC3FF"></div>
+      <div class="abs" style="right:-14px;top:-14px;background:#1E8BFF;color:#fff;border-radius:40px;padding:6px 18px;font-weight:900;font-size:36px;border:5px solid #05070D" id="callcnt">0</div>
+    </div>
+    <div class="layer" id="s2bubbles"></div>
+    <div class="abs" id="person" style="left:190px;top:640px;width:700px;height:760px"></div>
+    <div class="abs" id="thought" style="left:640px;top:600px;width:300px;height:200px">
+      <div class="abs" style="left:0;top:150px;width:34px;height:34px;border-radius:50%;background:#fff"></div>
+      <div class="abs" style="left:40px;top:110px;width:50px;height:50px;border-radius:50%;background:#fff"></div>
+      <div class="abs center disp" style="left:70px;top:0;width:230px;height:130px;border-radius:70px;background:#fff;color:#05070D;font-weight:900;font-size:80px">?!</div>
+    </div>
+  </div>
+
+  <!-- ================= SCENE 3: PAIN ================= -->
+  <div class="scene" id="sc3">
+    <div class="abs" style="left:0;right:0;top:200px;text-align:center">
+      <div class="tag" style="background:#fff;color:#05070D" id="s3tag">⏳ Javob kechikdi</div>
+    </div>
+    <div class="abs" id="lostTxt" style="left:0;right:0;top:330px;text-align:center">
+      <div class="h1 disp" style="font-size:112px"><span id="lostN">1</span> mijoz<br><span style="color:#8D97AB">chiqib ketdi</span></div>
+    </div>
+    <div class="abs" id="people" style="left:90px;top:650px;width:900px;height:150px"></div>
+    <div class="card" id="chartCard" style="left:90px;top:860px;width:900px;height:470px;padding:40px 44px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800;font-size:38px;color:#8D97AB">Daromad</div>
+        <div class="disp" id="revPct" style="font-weight:900;font-size:56px;color:#fff">0%</div>
+      </div>
+      <svg class="abs" style="left:44px;top:130px" width="812" height="300" viewBox="0 0 812 300">
+        <g stroke="#1E2A44" stroke-width="2"><line x1="0" y1="60" x2="812" y2="60"/><line x1="0" y1="150" x2="812" y2="150"/><line x1="0" y1="240" x2="812" y2="240"/></g>
+        <path id="downArea" fill="url(#gd)" d=""/>
+        <path id="downLine" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d=""/>
+        <circle id="downDot" r="16" fill="#fff"/>
+        <defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8D97AB" stop-opacity=".35"/><stop offset="1" stop-color="#8D97AB" stop-opacity="0"/></linearGradient></defs>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ================= SCENE 4A: STINGER ================= -->
+  <div class="scene" id="sc4s">
+    <div class="layer" id="rays"></div>
+    <div class="abs" id="ring1" style="left:540px;top:760px;width:10px;height:10px;border-radius:50%;border:8px solid rgba(255,255,255,.7)"></div>
+    <div class="abs" id="ring2" style="left:540px;top:760px;width:10px;height:10px;border-radius:50%;border:8px solid rgba(255,255,255,.5)"></div>
+    <div class="abs center" id="planeBig" style="left:340px;top:560px;width:400px;height:400px;border-radius:50%;background:#fff;box-shadow:0 40px 120px rgba(0,30,90,.45)">
+      <svg width="230" height="230" viewBox="0 0 24 24"><path fill="#1E8BFF" d="M21.5 3.6 2.9 10.8c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.2-15c.3-1.3-.5-1.9-1.6-1.4zM8.3 13.4l9.9-6.2c.5-.3.9-.1.5.2l-8.4 7.6-.3 3.6z"/></svg>
+    </div>
+    <div class="abs" id="s4title" style="left:0;right:0;top:1030px;text-align:center">
+      <div class="h1 disp" style="font-size:118px">TELEGRAM BOT</div>
+      <div class="disp" id="s4sub" style="display:inline-block;margin-top:20px;background:#fff;color:#1467E0;border-radius:24px;padding:12px 40px;font-weight:900;font-size:76px">ishga tushdi!</div>
+    </div>
+  </div>
+
+  <!-- ================= SCENE 4B: BOT CHAT ================= -->
+  <div class="scene" id="sc4c">
+    <div class="abs" style="left:0;right:0;top:170px;text-align:center" id="s4ctag"><span class="tag" style="background:#fff;color:#1467E0">⚡ Javob: 0.3 soniya</span></div>
+    <div class="phone" id="ph2" style="left:240px;top:280px;height:1080px;border-color:#fff;background:#fff">
+      <div class="notch"></div>
+      <div class="scr" style="background:#EAF2FF">
+        <div class="apphead" style="background:#1E8BFF">
+          <div class="av" style="background:#fff;color:#1E8BFF"><svg width="44" height="44" viewBox="0 0 24 24"><path fill="#1E8BFF" d="M12 2a2 2 0 0 1 1 3.7V7h4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h4V5.7A2 2 0 0 1 12 2zM9 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg></div>
+          <div><div style="font-weight:900;font-size:38px">Kompaniya Bot</div><div style="font-size:26px;font-weight:600;opacity:.85" id="botStatus">online • 24/7</div></div>
+        </div>
+        <div class="msgs" id="ph2msgs" style="bottom:40px"></div>
+      </div>
+    </div>
+    <div class="layer" id="s4fly"></div>
+  </div>
+
+  <!-- ================= SCENE 4C: RELAXED EMPLOYEE ================= -->
+  <div class="scene" id="sc4r">
+    <div class="abs" style="left:0;right:0;top:190px;text-align:center"><span class="tag" style="background:#fff;color:#1467E0">😌 Xodim xotirjam</span></div>
+    <div class="abs" id="person2" style="left:190px;top:470px;width:700px;height:760px"></div>
+    <div class="layer" id="checks"></div>
+    <div class="abs" id="installBtn" style="left:0;right:0;top:1230px;text-align:center"><span class="btn">
+      <svg width="58" height="58" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#1E8BFF"/><path fill="#fff" d="M17.8 7.2 5.9 11.8c-.8.3-.8.8-.1 1l3 .9 1.2 3.6c.1.4.1.6.5.6.3 0 .5-.1.7-.3l1.4-1.4 3.1 2.2c.6.3 1 .2 1.1-.5l2-9.5c.2-.9-.3-1.2-1-.9z"/></svg>
+      Botni o‘rnating</span></div>
+  </div>
+
+  <!-- ================= SCENE 4D: 24/7 + FEATURES ================= -->
+  <div class="scene" id="sc4f">
+    <div class="abs center" id="big247" style="left:140px;top:250px;width:800px;height:800px">
+      <svg class="abs" style="inset:0" width="800" height="800" viewBox="0 0 800 800">
+        <circle cx="400" cy="400" r="350" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="34"/>
+        <circle id="ring247" cx="400" cy="400" r="350" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" stroke-dasharray="2199" stroke-dashoffset="2199" transform="rotate(-90 400 400)"/>
+      </svg>
+      <div style="text-align:center">
+        <div class="disp" style="font-weight:900;font-size:260px;line-height:.9;letter-spacing:-.04em">24/7</div>
+        <div style="font-weight:800;font-size:52px;margin-top:20px;opacity:.9">uzluksiz ishlaydi</div>
+      </div>
+    </div>
+    <div class="abs" id="happy" style="left:0;right:0;top:1100px;text-align:center">
+      <div id="stars" style="font-size:90px;letter-spacing:10px"></div>
+      <div style="font-weight:900;font-size:54px;margin-top:6px">Mijozlar mamnun</div>
+    </div>
+    <div class="feat" id="f1" style="left:80px;top:250px"><div class="fi"><svg width="64" height="64" viewBox="0 0 24 24"><path fill="#fff" d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2zm3 6v2h10V9zm0 4v2h7v-2z"/></svg></div><div class="ft">Javob<br>beradi</div></div>
+    <div class="feat" id="f2" style="left:570px;top:250px"><div class="fi"><svg width="64" height="64" viewBox="0 0 24 24"><path fill="#fff" d="M12 2c4.4 0 8 1.6 8 3.5v13c0 1.9-3.6 3.5-8 3.5s-8-1.6-8-3.5v-13C4 3.6 7.6 2 12 2zm6 12.2C16.5 15 14.4 15.5 12 15.5S7.5 15 6 14.2v2.3c0 .6 2.4 2 6 2s6-1.4 6-2zm0-5.5C16.5 9.5 14.4 10 12 10s-4.5-.5-6-1.3V11c0 .6 2.4 2 6 2s6-1.4 6-2z"/></svg></div><div class="ft">Ma’lumot<br>to‘playdi</div></div>
+    <div class="feat" id="f3" style="left:80px;top:620px"><div class="fi"><svg width="64" height="64" viewBox="0 0 24 24"><path fill="#fff" d="M3 10v4a1 1 0 0 0 1 1h2l1 5h3l-1-5h1l7 4V5l-7 4H4a1 1 0 0 0-1 1zm17-1v6a3 3 0 0 0 0-6z"/></svg></div><div class="ft">Yangiliklarni<br>tarqatadi</div></div>
+    <div class="feat" id="f4" style="left:570px;top:620px"><div class="fi"><svg width="64" height="64" viewBox="0 0 24 24"><path fill="#fff" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v6l5 3 1-1.7-4-2.3z"/></svg></div><div class="ft">Vaqtni<br>tejaydi</div></div>
+    <div class="abs" id="featHead" style="left:0;right:0;top:1030px;text-align:center"><div class="h1 disp" style="font-size:84px">Bot siz uchun<br>ishlaydi</div></div>
+  </div>
+
+  <!-- ================= SCENE 5: RESULT ================= -->
+  <div class="scene" id="sc5">
+    <div class="abs" id="s5logo" style="left:0;right:0;top:200px;display:flex;justify-content:center;align-items:center;gap:34px">
+      <div class="center" style="width:170px;height:170px;border-radius:48px;background:#1E8BFF;box-shadow:0 20px 60px rgba(30,139,255,.5)">
+        <svg width="110" height="110" viewBox="0 0 24 24"><path fill="#fff" d="M21.5 3.6 2.9 10.8c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.2-15c.3-1.3-.5-1.9-1.6-1.4zM8.3 13.4l9.9-6.2c.5-.3.9-.1.5.2l-8.4 7.6-.3 3.6z"/></svg>
+      </div>
+      <div><div class="disp" style="font-weight:900;font-size:150px;line-height:.9;letter-spacing:-.03em">ICP <span style="color:#1E8BFF">IT</span></div>
+      <div style="font-weight:700;font-size:36px;color:#8D97AB;letter-spacing:.18em;margin-top:8px">IT KOMPANIYA</div></div>
+    </div>
+    <div class="card" id="growCard" style="left:90px;top:520px;width:900px;height:560px;padding:40px 44px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-weight:800;font-size:36px;color:#8D97AB">Mijozlar soni</div>
+        <div class="disp" id="growN" style="font-weight:900;font-size:110px;line-height:1.05">0</div></div>
+        <div class="center" id="growPct" style="background:#1E8BFF;border-radius:30px;padding:14px 26px;font-weight:900;font-size:44px">↑ 0%</div>
+      </div>
+      <svg class="abs" style="left:44px;top:250px" width="812" height="280" viewBox="0 0 812 280" id="bars"></svg>
+    </div>
+    <div class="abs" id="pills" style="left:0;right:0;top:1150px;display:flex;justify-content:center;gap:20px">
+      <span class="tag p" style="background:#fff;color:#05070D;letter-spacing:0;text-transform:none">Zamonaviy</span>
+      <span class="tag p" style="background:#1E8BFF;color:#fff;letter-spacing:0;text-transform:none">Tezkor</span>
+      <span class="tag p" style="background:#fff;color:#05070D;letter-spacing:0;text-transform:none">Qulay</span>
+    </div>
+  </div>
+
+  <!-- ================= SCENE 6: CTA ================= -->
+  <div class="scene" id="sc6">
+    <div class="abs" id="ctaQ" style="left:0;right:0;top:260px;text-align:center">
+      <div class="h1 disp" style="font-size:108px">Sizda hali<br>Telegram bot<br><span style="background:#fff;color:#1467E0;padding:0 26px;border-radius:26px">yo‘qmi?</span></div>
+    </div>
+    <div class="abs" id="ctaBtn" style="left:0;right:0;top:790px;text-align:center"><span class="btn" style="font-size:58px">Biz bilan bog‘laning <svg width="56" height="56" viewBox="0 0 24 24"><path fill="#1E8BFF" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg></span></div>
+    <div class="abs" id="ctaNow" style="left:0;right:0;top:990px;text-align:center"><div class="disp" style="font-weight:900;font-size:80px;letter-spacing:.04em">HOZIROQ!</div></div>
+    <div class="abs" id="tap" style="left:850px;top:880px;width:120px;height:120px">
+      <div class="abs" id="tapRing" style="left:-20px;top:-20px;width:110px;height:110px;border-radius:50%;border:6px solid #fff"></div>
+      <div style="font-size:110px;line-height:1">👆</div>
+    </div>
+    <div class="abs" id="ctaLogo" style="left:0;right:0;top:1170px;display:flex;justify-content:center;align-items:center;gap:18px">
+      <div class="center" style="width:78px;height:78px;border-radius:24px;background:#fff"><svg width="50" height="50" viewBox="0 0 24 24"><path fill="#1E8BFF" d="M21.5 3.6 2.9 10.8c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.2-15c.3-1.3-.5-1.9-1.6-1.4zM8.3 13.4l9.9-6.2c.5-.3.9-.1.5.2l-8.4 7.6-.3 3.6z"/></svg></div>
+      <div class="disp" style="font-weight:900;font-size:64px">ICP IT</div>
+    </div>
+  </div>
+
+  <div id="vign"></div>
+  <div id="wm"><div class="center" style="width:50px;height:50px;border-radius:15px;background:#1E8BFF"><svg width="32" height="32" viewBox="0 0 24 24"><path fill="#fff" d="M21.5 3.6 2.9 10.8c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.2-15c.3-1.3-.5-1.9-1.6-1.4zM8.3 13.4l9.9-6.2c.5-.3.9-.1.5.2l-8.4 7.6-.3 3.6z"/></svg></div>ICP IT</div>
+  <div id="subs"><div id="subbox"></div></div>
+  <div id="flash"></div>
+</div>
+
+<script src="timeline.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const lerp=(a,b,x)=>a+(b-a)*x;
+const E={out:x=>1-Math.pow(1-x,3),in:x=>x*x*x,io:x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,
+ back:x=>{const c1=1.9,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)},
+ el:x=>x===0?0:x===1?1:Math.pow(2,-10*x)*Math.sin((x*10-.75)*(2*Math.PI/3))+1};
+function tf(el,o){const{x=0,y=0,s=1,sx,sy,r=0,op=1,blur=0}=o;
+  el.style.transform=`translate(${x}px,${y}px) scale(${sx??s},${sy??s}) rotate(${r}deg)`;
+  el.style.opacity=op; el.style.filter=blur>0.05?`blur(${blur}px)`:'none';
+  el.style.visibility=op<=0.001?'hidden':'visible';}
+// popIn: scale+fade at time a
+const pop=(t,a,d=.45)=>E.back(P(t,a,a+d));
+const fin=(t,a,d=.3)=>E.out(P(t,a,a+d));
+function sceneOp(t,a,b,fi=.25,fo=.25){return Math.min(P(t,a,a+fi), 1-P(t,b-fo,b));}
+const SEG={}; TL.segs.forEach(s=>SEG[s.id]=s);
+const W=(id,i)=>SEG[id].words[i].a;
+const noise=(i)=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+
+// ---------- scene boundaries ----------
+const T1=[0,4.95], T2=[4.95,15.95], T3=[15.95,23.9], T4S=[23.9,25.75], T4C=[25.75,W('s4a',12)-0.05], T4R=[W('s4a',12)-0.05,35.35], T4F=[35.35,47.3], T5=[47.3,58.75], T6=[58.75,TL.end];
+
+// ---------- dots ----------
+const dots=[]; for(let i=0;i<26;i++){const d=document.createElement('div');d.className='dot';$('dots').appendChild(d);dots.push(d);}
+
+// ---------- Scene 1 build ----------
+const S1MSG=[["Aziz","Dostavka bormi?","#1E8BFF"],["Malika","Narxi qancha?","#4FC3FF"],["Javlon","Manzil qayerda?","#0A2A66"],["Dilnoza","Dostavka bormi??","#1E8BFF"],["Sardor","Soat nechgacha ishlaysiz?","#4FC3FF"],["Kamola","Narxi qancha?","#0A2A66"],["Bekzod","Manzil?","#1E8BFF"],["Nodira","Javob bering!","#4FC3FF"],["Otabek","Dostavka bormi?","#0A2A66"],["Shahlo","Narxi???","#1E8BFF"],["Rustam","Hali ochiqmisiz?","#4FC3FF"],["Zarina","Iltimos javob bering","#0A2A66"]];
+const S1T=[0.45,0.9,1.3,1.65,1.95,2.2,2.45,2.68,2.88,3.06,3.22,3.37];
+const ph1=[];
+S1MSG.forEach(([n,m,c],i)=>{const d=document.createElement('div');d.className='msg in';
+  d.innerHTML=`<div class="av" style="background:${c}">${n[0]}</div><div class="bub"><div class="name">${n}</div>${m}</div>`;
+  $('ph1msgs').appendChild(d);ph1.push(d);});
+const FLY=["Dostavka bormi?","Narxi qancha?","Manzil?","Dostavka?","Narxi qancha?","Manzil qayerda?","Javob bering!","Dostavka bormi?","Ochiqmisiz?","Narxi?","Manzil?","Dostavka bormi?","Narxi qancha?","Javob kerak!","Manzil?","Dostavka?","Narx?","???"];
+const fly1=FLY.map((txt,i)=>{const d=document.createElement('div');d.className='fly';
+  d.innerHTML=`<span class="ic"><svg width="26" height="26" viewBox="0 0 24 24"><path fill="#fff" d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2z"/></svg></span>${txt}`;
+  $('flyers1').appendChild(d);
+  return {d,t:2.0+i*0.15,x:noise(i)*760-60,y:260+noise(i+50)*1050,r:(noise(i+9)-.5)*16};});
+
+// ---------- Character (SVG) ----------
+function personSVG(mode){ // mode 'tired' | 'happy'
+ const skin="#F1C7A1", hair="#14171F", shirt="#1E8BFF";
+ return `<svg width="700" height="760" viewBox="0 0 700 760">
+  <ellipse cx="350" cy="745" rx="300" ry="20" fill="rgba(0,0,0,.35)"/>
+  <!-- chair back -->
+  <rect x="160" y="300" width="380" height="420" rx="60" fill="#0F1626" stroke="#1E2A44" stroke-width="4"/>
+  <!-- body -->
+  <path d="M170 720 C170 520 230 440 350 440 C470 440 530 520 530 720 Z" fill="${shirt}"/>
+  <path d="M300 440 L350 520 L400 440 Z" fill="#fff"/>
+  <rect x="318" y="380" width="64" height="80" rx="20" fill="${skin}"/>
+  <g id="${mode}-head">
+   <ellipse cx="240" cy="270" rx="22" ry="32" fill="${skin}"/><ellipse cx="460" cy="270" rx="22" ry="32" fill="${skin}"/>
+   <ellipse cx="350" cy="260" rx="112" ry="130" fill="${skin}"/>
+   <path d="M236 240 C230 140 300 112 352 112 C420 112 478 150 466 245 C450 200 420 178 380 174 C330 170 290 190 236 240 Z" fill="${hair}"/>
+   ${mode==='tired'?`
+   <g id="tired-eyes">
+    <ellipse cx="305" cy="268" rx="22" ry="20" fill="#fff"/><ellipse cx="395" cy="268" rx="22" ry="20" fill="#fff"/>
+    <circle cx="305" cy="274" r="10" fill="#05070D"/><circle cx="395" cy="274" r="10" fill="#05070D"/>
+    <rect id="lidL" x="280" y="246" width="50" height="22" fill="${skin}"/><rect id="lidR" x="370" y="246" width="50" height="22" fill="${skin}"/>
+    <path d="M283 266 Q305 262 327 266" stroke="#05070D" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M373 266 Q395 262 417 266" stroke="#05070D" stroke-width="5" fill="none" stroke-linecap="round"/>
+   </g>
+   <path d="M288 298 Q305 306 322 298" stroke="#B6927A" stroke-width="5" fill="none" stroke-linecap="round"/>
+   <path d="M378 298 Q395 306 412 298" stroke="#B6927A" stroke-width="5" fill="none" stroke-linecap="round"/>
+   <path d="M280 232 L328 244" stroke="${hair}" stroke-width="9" stroke-linecap="round"/><path d="M420 232 L372 244" stroke="${hair}" stroke-width="9" stroke-linecap="round"/>
+   <path id="tmouth" d="M322 345 Q350 328 378 345" stroke="#7A3B2E" stroke-width="8" fill="none" stroke-linecap="round"/>
+   <path id="sweat" d="M468 190 C478 210 486 222 486 232 A18 18 0 0 1 450 232 C450 222 458 210 468 190 Z" fill="#4FC3FF"/>
+   `:`
+   <path d="M283 272 Q305 250 327 272" stroke="#05070D" stroke-width="8" fill="none" stroke-linecap="round"/>
+   <path d="M373 272 Q395 250 417 272" stroke="#05070D" stroke-width="8" fill="none" stroke-linecap="round"/>
+   <path d="M282 226 Q305 214 328 224" stroke="${hair}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M372 224 Q395 214 418 226" stroke="${hair}" stroke-width="9" fill="none" stroke-linecap="round"/>
+   <ellipse cx="282" cy="312" rx="20" ry="12" fill="#F49A8C" opacity=".5"/><ellipse cx="418" cy="312" rx="20" ry="12" fill="#F49A8C" opacity=".5"/>
+   <path d="M310 326 Q350 372 390 326 Z" fill="#7A3B2E"/><path d="M318 330 Q350 342 382 330" stroke="#fff" stroke-width="8" fill="none"/>
+   `}
+  </g>
+  ${mode==='tired'?`
+  <!-- arms holding phone -->
+  <path d="M200 560 C230 640 300 640 330 600" stroke="${shirt}" stroke-width="64" fill="none" stroke-linecap="round"/>
+  <path d="M500 560 C470 640 400 640 370 600" stroke="${shirt}" stroke-width="64" fill="none" stroke-linecap="round"/>
+  <rect x="300" y="470" width="100" height="170" rx="16" fill="#05070D" stroke="#2A3550" stroke-width="5"/>
+  <rect id="phglow" x="308" y="480" width="84" height="150" rx="10" fill="#4FC3FF"/>
+  <circle cx="320" cy="600" r="24" fill="${skin}"/><circle cx="380" cy="600" r="24" fill="${skin}"/>
+  `:`
+  <!-- relaxed: one arm with cup -->
+  <path d="M200 580 C190 660 260 700 330 640" stroke="${shirt}" stroke-width="64" fill="none" stroke-linecap="round"/>
+  <path d="M510 580 C540 520 520 470 470 430" stroke="${shirt}" stroke-width="64" fill="none" stroke-linecap="round"/>
+  <g id="cup"><rect x="318" y="560" width="96" height="104" rx="18" fill="#fff"/><path d="M414 584 C452 584 452 640 414 640" stroke="#fff" stroke-width="14" fill="none"/>
+   <rect x="318" y="560" width="96" height="26" rx="10" fill="#1E8BFF"/>
+   <path id="st1" d="M345 540 C330 515 360 500 345 470" stroke="rgba(255,255,255,.8)" stroke-width="8" fill="none" stroke-linecap="round"/>
+   <path id="st2" d="M385 540 C370 515 400 500 385 470" stroke="rgba(255,255,255,.8)" stroke-width="8" fill="none" stroke-linecap="round"/></g>
+  <circle cx="340" cy="640" r="26" fill="${skin}"/>
+  <circle cx="462" cy="420" r="26" fill="${skin}"/>
+  `}
+  <!-- desk -->
+  <rect x="0" y="650" width="700" height="110" rx="20" fill="#05070D" stroke="#1E2A44" stroke-width="4"/>
+  ${mode==='happy'?`<g><rect x="470" y="560" width="200" height="96" rx="10" fill="#1A2232"/><rect x="480" y="568" width="180" height="80" rx="6" fill="#1E8BFF"/>
+   <rect x="494" y="582" width="110" height="18" rx="9" fill="#fff"/><rect x="530" y="612" width="116" height="18" rx="9" fill="rgba(255,255,255,.6)"/></g>`:''}
+ </svg>`;}
+$('person').innerHTML=personSVG('tired');
+$('person2').innerHTML=personSVG('happy');
+
+// scene 2 bubbles
+const S2B=["Dostavka bormi?","Narxi?","Manzil?","Javob bering!","Ochiqmisiz?","Narxi qancha?","Buyurtma?","Dostavka?","Chegirma bormi?","Manzil qayerda?","???","Javob yo‘q..."];
+const s2b=S2B.map((txt,i)=>{const d=document.createElement('div');d.className='fly';d.style.fontSize='32px';
+  d.innerHTML=`<span class="ic" style="width:40px;height:40px"><svg width="22" height="22" viewBox="0 0 24 24"><path fill="#fff" d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2z"/></svg></span>${txt}`;
+  $('s2bubbles').appendChild(d);
+  const left=i%2===0; const row=Math.floor(i/2);
+  return {d,t:5.5+i*0.52,x:left?40+noise(i)*60:650-noise(i)*90,y:860+row*-60 - row*40,r:(left?-1:1)*(3+noise(i+3)*5)};});
+// people (scene 3)
+const PEOPLE=[]; for(let i=0;i<7;i++){const d=document.createElement('div');d.className='abs';d.style.left=(i*128+10)+'px';d.style.top='0px';
+ d.innerHTML=`<svg width="110" height="150" viewBox="0 0 110 150"><circle cx="55" cy="38" r="30" fill="#fff"/><path d="M8 150 C8 92 30 76 55 76 C80 76 102 92 102 150Z" fill="#fff"/></svg>`;
+ $('people').appendChild(d);PEOPLE.push(d);}
+const LOSE=[W('s3',3),W('s3',4)+.3,W('s3',7),W('s3',8)+.2,W('s3',10),W('s3',11)];
+// bot chat (scene 4c)
+const BOT=[["in","Dostavka bormi?",25.95],["out","Ha! 30 daqiqada yetkazamiz 🚀",26.45],["in","Narxi qancha?",27.55],["out","Narxlar ro‘yxati 👇<div style='display:flex;gap:10px;margin-top:14px'><span style='background:#fff;color:#1E8BFF;border-radius:16px;padding:8px 16px;font-size:26px'>📋 Menyu</span><span style='background:#fff;color:#1E8BFF;border-radius:16px;padding:8px 16px;font-size:26px'>🛒 Buyurtma</span></div>",27.95],["in","Manzil?",29.0],["out","📍 Lokatsiya yuborildi",29.35],["in","Kechasi ham ishlaysizmi?",30.2],["out","Ha, 24/7 xizmatdamiz ✅",30.55]];
+const ph2=BOT.map(([k,txt,t])=>{const d=document.createElement('div');d.className='msg '+k;
+ d.innerHTML=k==='in'?`<div class="bub" style="background:#fff;color:#05070D">${txt}</div>`:`<div class="bub">${txt}<div style="font-size:22px;opacity:.8;text-align:right;margin-top:4px">0.3s ✓✓</div></div>`;
+ $('ph2msgs').appendChild(d);return {d,t};});
+// typing indicator
+const typing=document.createElement('div');typing.className='msg out';typing.innerHTML=`<div class="bub" style="padding:22px 28px;display:flex;gap:10px"><i class="td"></i><i class="td"></i><i class="td"></i></div>`;
+typing.querySelectorAll('.td').forEach(e=>{e.style.cssText='width:16px;height:16px;border-radius:50%;background:#fff;display:block'});
+$('ph2msgs').appendChild(typing);
+// floating checks (scene 4r)
+const CHK=["✓ Javob berildi","✓ Buyurtma qabul qilindi","✓ Savolga javob","✓ Ma’lumot yuborildi"];
+const chk=CHK.map((txt,i)=>{const d=document.createElement('div');d.className='fly';d.style.fontSize='34px';d.innerHTML=txt;$('checks').appendChild(d);
+ return {d,t:31.9+i*0.55,x:i%2?560:60,y:430+i*40};});
+// stars
+$('stars').textContent='★★★★★';
+// rays
+for(let i=0;i<16;i++){const r=document.createElement('div');r.className='abs';r.style.cssText=`left:540px;top:760px;width:1400px;height:70px;margin-top:-35px;transform-origin:0 50%;background:linear-gradient(90deg,rgba(255,255,255,.22),rgba(255,255,255,0));transform:rotate(${i*22.5}deg);clip-path:polygon(0 50%,100% 0,100% 100%)`;$('rays').appendChild(r);}
+// bars scene 5
+(function(){let h='';const n=8;for(let i=0;i<n;i++){h+=`<rect class="bar" x="${i*104+6}" y="0" width="80" height="0" rx="16" fill="${i===n-1?'#4FC3FF':'#1E8BFF'}"/>`;}
+ h+=`<path id="upLine" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" d=""/><circle id="upDot" r="15" fill="#fff"/>`;$('bars').innerHTML=h;})();
+const BARS=[...document.querySelectorAll('.bar')];
+const BARH=[50,70,64,98,120,150,196,250];
+
+// subtitle state
+let lastChunkKey=null;
+function renderSubs(t){
+  let chunk=null,seg=null;
+  for(const s of TL.segs){for(const c of s.chunks){ if(t>=c.a-0.05 && t<c.e+0.25){chunk=c;seg=s;} }}
+  const box=$('subbox');
+  if(!chunk){box.style.opacity=0;lastChunkKey=null;return;}
+  const key=seg.id+chunk.a;
+  if(key!==lastChunkKey){box.innerHTML=chunk.words.map(w=>`<span class="sw ${seg.id==='s2b'?'f':''}">${w.w}</span>`).join('');lastChunkKey=key;}
+  const p=P(t,chunk.a-0.05,chunk.a+0.12);
+  box.style.opacity=1; box.style.transform=`translateY(${(1-E.out(p))*30}px) scale(${0.9+0.1*E.back(p)})`;
+  [...box.children].forEach((el,i)=>{const w=chunk.words[i];const on=t>=w.a-0.02&&t<(chunk.words[i+1]?chunk.words[i+1].a-0.02:chunk.e+0.25);
+    el.classList.toggle('on',on); el.style.transform=on?`scale(${1+0.06*(1-P(t,w.a,w.a+0.15))})`:'none';});
+  box.style.background=(t>T4S[0]&&t<T6[1])?'rgba(5,7,13,.82)':'rgba(5,7,13,.78)';
+}
+
+function render(t){
+  // backgrounds
+  const blueAmt=clamp(P(t,23.85,24.0)) * (1-P(t,47.0,47.6)) + P(t,58.5,59.0);
+  $('bgB').style.opacity=clamp(blueAmt);
+  // grid drift + dots
+  const g=$('grid'); g.style.transform=`translate(${(t*18)%90}px,${(t*30)%90}px)`;
+  g.style.opacity = t<15.95?0.9: t<23.9?0.35: 0.6;
+  dots.forEach((d,i)=>{const sp=20+noise(i)*40;const y=(1980-((t*sp+noise(i+7)*1980)%2050));const x=noise(i+3)*1080+Math.sin(t*.7+i)*30;
+    const sz=4+noise(i+11)*10; d.style.width=d.style.height=sz+'px'; d.style.transform=`translate(${x}px,${y}px)`;
+    d.style.opacity=(0.15+0.35*noise(i+5))*(t>15.95&&t<23.9?0.3:1); d.style.background=(blueAmt>.5)?'#fff':'#4FC3FF';});
+  // global shake
+  let shake=0;
+  if(t>3.4&&t<4.95) shake=P(t,3.4,4.6)*14;
+  if(t>22.4&&t<23.9) shake=P(t,22.4,23.85)*18;
+  const st=$('stage'); const sx=Math.sin(t*93)*shake, sy=Math.cos(t*71)*shake;
+  ['sc1','sc2','sc3'].forEach(id=>$(id).style.translate=`${sx}px ${sy}px`);
+  // flash
+  let fl=0; fl=Math.max(fl,1-P(t,23.9,24.35)); if(t<23.9) fl=P(t,23.55,23.9);
+  fl=Math.max(fl, t>4.8&&t<5.2 ? 0.0:0);
+  $('flash').style.opacity=t>23.4&&t<24.4?fl:0;
+  $('vign').style.opacity = blueAmt>.5?0.5:1;
+  $('wm').style.opacity = (t<0.3||t>58.75)?0:1;
+
+  // ======= SCENE 1 =======
+  {const o=sceneOp(t,T1[0],T1[1],0.01,0.25); const sc=$('sc1'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const zoomOut=E.in(P(t,4.6,4.95));
+    tf($('ph1'),{y:(1-E.out(P(t,0,0.6)))*500, s:1+zoomOut*0.6, op:1, blur:zoomOut*12});
+    tf($('s1tag'),{y:(1-pop(t,0.2))*-40, op:fin(t,0.2)});
+    let n=0; ph1.forEach((d,i)=>{const a=S1T[i]; const v=t>=a; d.style.display=v?'flex':'none'; if(v){n++; tf(d,{s:pop(t,a,0.3),op:fin(t,a,.12)});}});
+    $('ph1cnt').textContent=n;
+    const bt=pop(t,3.5,0.4); tf($('b99'),{s:bt*(1+0.08*Math.sin(t*20)),op:fin(t,3.5,.1)});
+    $('b99').textContent = t<3.5?'':(t<3.9?'47':(t<4.2?'86':'99+'));
+    fly1.forEach(f=>{const p=pop(t,f.t,0.35); tf(f.d,{x:f.x,y:f.y+(1-p)*60,s:p,r:f.r,op:fin(t,f.t,.12)});});
+   }}
+
+  // ======= SCENE 2 =======
+  {const o=sceneOp(t,T2[0],T2[1],0.3,0.3); const sc=$('sc2'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const lt=t-T2[0];
+    const zin=E.out(P(t,T2[0],T2[0]+0.6));
+    // camera: zoom to face during s2b
+    const cz=E.io(P(t,12.0,12.8))*(1-E.io(P(t,15.5,15.95)));
+    sc.style.transform=`scale(${1+0.35*cz}) translate(0px,${-cz*120}px)`; sc.style.transformOrigin='540px 900px';
+    tf($('s2head'),{y:(1-zin)*-60,op:zin*(1-cz)});
+    const cnt=Math.floor(lerp(0,148,E.io(P(t,5.4,15.0)))); $('s2count').textContent=cnt;
+    tf($('person'),{y:(1-zin)*200+Math.sin(t*2)*4,op:zin});
+    // tired eyes: lids droop + blink
+    const blink=(Math.abs(((t+0.3)%3.1)-0.1)<0.08)?1:0;
+    const lid=0.55+0.25*Math.sin(t*1.3)*0.5+blink*0.45;
+    ['lidL','lidR'].forEach(id=>{const e=$(id); if(e){e.setAttribute('height',String(22+lid*14));}});
+    const sw=$('sweat'); if(sw){const sp=((t-5)%1.6)/1.6; sw.setAttribute('transform',`translate(0 ${sp*60})`); sw.style.opacity=sp<.85?1:0;}
+    const pg=$('phglow'); if(pg){pg.style.opacity=0.6+0.4*(Math.sin(t*14)>0?1:0);}
+    // clock hands spin fast
+    $('mh').style.transform=`rotate(${lt*360}deg)`; $('hh').style.transform=`rotate(${lt*30}deg)`;
+    tf($('clock'),{s:pop(t,5.3),op:fin(t,5.3)*(1-cz)});
+    // calls ringing
+    const ring=pop(t,6.4); const wob=Math.sin(t*40)*6*(Math.sin(t*3)>0?1:0);
+    tf($('call'),{s:ring,r:wob,op:fin(t,6.4)*(1-cz)});
+    [['callring1',0],['callring2',0.5]].forEach(([id,off])=>{const p=((t+off)%1)/1;tf($(id),{s:1+p*0.6,op:(1-p)*0.8});});
+    $('callcnt').textContent=Math.max(0,Math.floor(lerp(0,37,P(t,6.4,15))));
+    s2b.forEach((b,i)=>{const p=pop(t,b.t,.35);const rise=Math.max(0,(t-b.t))*0;tf(b.d,{x:b.x,y:b.y-rise+(1-p)*40,s:p*0.95,r:b.r+Math.sin(t*3+i)*1.5,op:fin(t,b.t,.1)*(1-cz*0.7)});});
+    const th=pop(t,12.5,.5); tf($('thought'),{s:th,op:fin(t,12.5,.2),y:Math.sin(t*3)*6});
+   }}
+
+  // ======= SCENE 3 =======
+  {const o=sceneOp(t,T3[0],T3[1],0.35,0.05); const sc=$('sc3'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const gl=(t>22.6&&t<23.9&&noise(Math.floor(t*24))>.6)?1:0;
+    sc.style.filter=gl?`contrast(1.4) brightness(1.2)`:'none';
+    sc.style.translate=gl?`${(noise(Math.floor(t*30))-.5)*40}px 0px`:sc.style.translate;
+    tf($('s3tag'),{op:fin(t,16.1),y:(1-fin(t,16.1))*-30});
+    let lost=0; LOSE.forEach(a=>{if(t>=a)lost++;});
+    $('lostN').textContent=Math.max(1,lost);
+    tf($('lostTxt'),{s:pop(t,LOSE[0]-0.15,.5)*(1+0.05*(lost>1?(1-P(t,LOSE[Math.max(0,lost-1)],LOSE[Math.max(0,lost-1)]+.3)):0)),op:fin(t,LOSE[0]-0.15,.2)});
+    tf($('people'),{op:fin(t,16.3),y:(1-fin(t,16.3,.5))*40});
+    PEOPLE.forEach((d,i)=>{const idx=[6,1,4,2,5,0][LOSE.length-1-i] ;});
+    const order=[6,2,4,0,5,1];
+    PEOPLE.forEach((d,i)=>{const k=order.indexOf(i); if(k<0||t<LOSE[k]){tf(d,{op:1});return;} const p=P(t,LOSE[k],LOSE[k]+0.8);
+      tf(d,{x:p*260*(i<3?-1:1),y:-p*30,op:1-E.out(p),s:1-p*.3}); });
+    // chart going down
+    tf($('chartCard'),{y:(1-E.out(P(t,16.5,17.1)))*300,op:fin(t,16.5)});
+    const cp=E.io(P(t,17.2,22.6));
+    const pts=[];const N=40; for(let i=0;i<=N;i++){const x=i/N; if(x>cp) break; const y=40+ x*x*200 + Math.sin(x*22)*14*(x); pts.push([x*812,Math.min(285,y)]);}
+    if(pts.length>1){const d='M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L');$('downLine').setAttribute('d',d);
+      $('downArea').setAttribute('d',d+` L${pts[pts.length-1][0]} 300 L0 300 Z`);const l=pts[pts.length-1];$('downDot').setAttribute('cx',l[0]);$('downDot').setAttribute('cy',l[1]);}
+    else {$('downLine').setAttribute('d','');$('downArea').setAttribute('d','');$('downDot').setAttribute('cx',-50);}
+    $('revPct').textContent='−'+Math.round(cp*68)+'%';
+   }}
+
+  // ======= SCENE 4 STINGER =======
+  {const o=sceneOp(t,T4S[0],T4S[1],0.02,0.25); const sc=$('sc4s'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    $('rays').style.transform=`rotate(${t*20}deg)`; $('rays').style.transformOrigin='540px 760px'; $('rays').style.opacity=fin(t,23.95,.4);
+    const pp=E.out(P(t,23.92,24.45));
+    tf($('planeBig'),{x:(1-pp)*-700,y:(1-pp)*500,r:(1-pp)*-40,s:pop(t,23.95,.6)*(1+0.03*Math.sin(t*8))});
+    [['ring1',24.0],['ring2',24.3]].forEach(([id,a])=>{const p=E.out(P(t,a,a+1.1));tf($(id),{s:1+p*120,op:(1-p)*(t>a?1:0)});});
+    tf($('s4title'),{s:pop(t,24.25,.5),op:fin(t,24.25,.15),y:(1-fin(t,24.25,.4))*80});
+    tf($('s4sub'),{s:pop(t,24.55,.5),op:fin(t,24.55,.15),r:-3});
+    if(t>T4S[1]-0.3){sc.style.transform=`scale(${1+E.in(P(t,T4S[1]-.3,T4S[1]))*0.4})`;sc.style.transformOrigin='540px 900px';} else sc.style.transform='none';
+   }}
+
+  // ======= SCENE 4 CHAT =======
+  {const o=sceneOp(t,T4C[0],T4C[1],0.25,0.3); const sc=$('sc4c'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    tf($('ph2'),{y:(1-E.out(P(t,T4C[0],T4C[0]+.6)))*900,r:(1-E.out(P(t,T4C[0],T4C[0]+.6)))*8});
+    tf($('s4ctag'),{s:pop(t,26.5),op:fin(t,26.5)});
+    let typingOn=false;
+    ph2.forEach((m,i)=>{const v=t>=m.t; m.d.style.display=v?'flex':'none'; if(v) tf(m.d,{s:pop(t,m.t,.3),op:fin(t,m.t,.1)});
+      if(i%2===1 && t>=ph2[i-1].t+0.08 && t<m.t) typingOn=true;});
+    typing.style.display=typingOn?'flex':'none';
+    if(typingOn){typing.querySelectorAll('.td').forEach((e,k)=>{e.style.transform=`translateY(${Math.sin(t*20-k)*6}px)`;});}
+    // keep latest visible: limit to last 6
+    const vis=ph2.filter(m=>t>=m.t); vis.forEach((m,i)=>{if(i<vis.length-6)m.d.style.display='none';});
+   }}
+
+  // ======= SCENE 4 RELAX =======
+  {const o=sceneOp(t,T4R[0],T4R[1],0.3,0.3); const sc=$('sc4r'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const zi=E.out(P(t,T4R[0],T4R[0]+.6));
+    tf($('person2'),{y:(1-zi)*120+Math.sin(t*1.5)*6,s:0.9+0.1*zi,op:zi});
+    ['st1','st2'].forEach((id,k)=>{const e=$(id);const p=((t*0.8+k*0.5)%1);e.setAttribute('transform',`translate(0 ${-p*40})`);e.style.opacity=Math.sin(p*Math.PI);});
+    const cup=$('cup'); const sip=Math.max(0,Math.sin((t-31.6)*1.6)); cup.setAttribute('transform',`translate(0 ${-sip*16}) rotate(${-sip*6} 366 610)`);
+    chk.forEach(c=>{const p=pop(t,c.t,.35);const life=P(t,c.t,c.t+2.2);tf(c.d,{x:c.x,y:c.y-life*120,s:p,op:fin(t,c.t,.1)*(1-P(t,c.t+1.6,c.t+2.2))});});
+    const ib=W('s4a',15)-0.1; tf($('installBtn'),{s:pop(t,ib,.5)*(1+0.04*Math.sin(t*8)),op:fin(t,ib,.15)});
+   }}
+
+  // ======= SCENE 4 FEATURES =======
+  {const o=sceneOp(t,T4F[0],T4F[1],0.3,0.3); const sc=$('sc4f'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const outA=E.in(P(t,40.9,41.35));
+    const t247=W('s4b',3);
+    tf($('big247'),{s:pop(t,35.45,.6)*(1+0.1*Math.sin(Math.PI*P(t,t247-0.05,t247+0.35)))*(1-outA*.3),op:fin(t,35.45,.2)*(1-outA)});
+    $('ring247').setAttribute('stroke-dashoffset',String(2199*(1-E.io(P(t,t247,t247+1.6)))));
+    const hp=W('s4b',5);
+    tf($('happy'),{s:pop(t,hp,.5),op:fin(t,hp,.15)*(1-outA)});
+    const nS=Math.floor(clamp(P(t,hp+.1,hp+1.2))*5+0.0001); $('stars').innerHTML='<span style="color:#fff">'+'★'.repeat(nS)+'</span><span style="color:rgba(255,255,255,.25)">'+'★'.repeat(5-nS)+'</span>';
+    const fts=[W('s4b',12),W('s4b',14),W('s4b',16),W('s4b',19)];
+    ['f1','f2','f3','f4'].forEach((id,i)=>{const a=fts[i];const p=pop(t,a-0.1,.5);const hl=t>=a&&t<(fts[i+1]??46.4)?1:0;
+      tf($(id),{s:p*(1+hl*0.04),y:(1-p)*60,op:fin(t,a-0.1,.15),r:(1-p)*(i%2?6:-6)});
+      $(id).style.background=hl?'#fff':'rgba(255,255,255,.92)'; $(id).style.boxShadow=hl?'0 0 0 8px rgba(255,255,255,.35),0 30px 70px rgba(5,20,60,.35)':'0 30px 70px rgba(5,20,60,.35)';});
+    tf($('featHead'),{s:pop(t,W('s4b',9)-.1,.5),op:fin(t,W('s4b',9)-.1,.15)});
+   }}
+
+  // ======= SCENE 5 =======
+  {const o=sceneOp(t,T5[0],T5[1],0.35,0.3); const sc=$('sc5'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    const lg=W('s5a',1);
+    tf($('s5logo'),{s:pop(t,lg-0.2,.6),op:fin(t,lg-0.2,.2)});
+    tf($('growCard'),{y:(1-E.out(P(t,47.3,48.0)))*500,op:fin(t,47.3,.3)});
+    const gp=E.io(P(t,48.2,53.0));
+    BARS.forEach((b,i)=>{const p=E.back(P(t,48.2+i*0.35,48.2+i*0.35+0.6));const h=BARH[i]*p;b.setAttribute('y',String(270-h));b.setAttribute('height',String(Math.max(0,h)));});
+    const pts=BARH.map((h,i)=>[i*104+46,270-h-30]); const vis=[];
+    const cut=gp*(pts.length-1); for(let i=0;i<=Math.floor(cut);i++)vis.push(pts[i]);
+    if(Math.floor(cut)<pts.length-1){const f=cut-Math.floor(cut);const a=pts[Math.floor(cut)],b=pts[Math.floor(cut)+1];vis.push([lerp(a[0],b[0],f),lerp(a[1],b[1],f)]);}
+    $('upLine').setAttribute('d',vis.length>1?'M'+vis.map(p=>p.join(' ')).join(' L'):'');
+    const l=vis[vis.length-1]; $('upDot').setAttribute('cx',l?l[0]:-50); $('upDot').setAttribute('cy',l?l[1]:-50);
+    const n=Math.floor(lerp(120,3480,gp)); $('growN').textContent=n.toLocaleString('ru-RU').replace(/ /g,' ');
+    $('growPct').textContent='↑ '+Math.round(gp*250)+'%';
+    const pl=[...document.querySelectorAll('#pills .p')]; const pt=[W('s5a',11),W('s5a',12),W('s5a',15)];
+    pl.forEach((e,i)=>tf(e,{s:pop(t,pt[i]-.05,.45),op:fin(t,pt[i]-.05,.12)}));
+    const pu=E.out(P(t,56.3,57.6)); tf($('pills'),{y:-pu*0});
+   }}
+
+  // ======= SCENE 6 CTA =======
+  {const o=sceneOp(t,T6[0],T6[1]+1,0.3,0.01); const sc=$('sc6'); sc.style.opacity=o; sc.style.visibility=o>0?'visible':'hidden';
+   if(o>0){
+    tf($('ctaQ'),{s:pop(t,58.85,.6),op:fin(t,58.85,.2)});
+    const bt=W('s5b',5)-0.1;
+    tf($('ctaBtn'),{s:pop(t,bt,.55)*(1+0.05*Math.max(0,Math.sin((t-bt)*6))),op:fin(t,bt,.15)});
+    tf($('ctaNow'),{s:pop(t,W('s5b',8)-.05,.5),op:fin(t,W('s5b',8)-.05,.15)});
+    const tp=t-(bt+1.0); const tapC=((tp%1.3)+1.3)%1.3;
+    tf($('tap'),{op:tp>0?1:0,y:tapC<.25?tapC*40:Math.max(0,10-(tapC-.25)*40),s:tapC<.25?1-tapC*.3:0.93});
+    const tr=P(tapC,0.2,0.8); tf($('tapRing'),{s:0.6+tr*1.4,op:tp>0?(1-tr):0});
+    tf($('ctaLogo'),{op:fin(t,60.5,.4),y:(1-fin(t,60.5,.4))*30});
+   }}
+
+  renderSubs(t);
+}
+window.render=render;
+render(0);
+</script>
+</body></html>

@@ -42,8 +42,8 @@ async def seg(k,sp):
     subprocess.run(["ffmpeg","-y","-v","error","-f","concat","-safe","0","-i",lst,"-c","copy",raw],check=True)
     # "ad read" processing: clean lows, presence lift, compression, a touch of air
     subprocess.run(["ffmpeg","-y","-v","error","-i",raw,"-af",
-      "highpass=f=85,equalizer=f=250:t=q:w=1.2:g=-2,equalizer=f=3200:t=q:w=1.0:g=3.5,equalizer=f=9000:t=h:w=2000:g=2,"
-      "acompressor=threshold=-20dB:ratio=3.5:attack=4:release=90:makeup=4,alimiter=limit=0.95",
+      "highpass=f=80,equalizer=f=3000:t=q:w=1.2:g=1.5,"
+      "acompressor=threshold=-18dB:ratio=2:attack=10:release=150:makeup=2,alimiter=limit=0.95",
       f"{S}/vo/{k}.wav"],check=True)
     open(f"{S}/vo/{k}.wav.srt","w").write("\n".join(f"{i+1}\n{fmt(a)} --> {fmt(e)}\n{w}\n" for i,(w,a,e) in enumerate(allw)))
     print(k, round(t,2), "s")
