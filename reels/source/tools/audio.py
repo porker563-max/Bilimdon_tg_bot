@@ -169,9 +169,9 @@ place(sfx,popfx(1200,400,0.12),24.25,0.5); place(sfx,popfx(1500,500,0.12),24.55,
 place(sfx,whoosh(0.6,400,5000),25.6,0.45)
 BOT=[("in",25.95),("out",26.45),("in",27.55),("out",27.95),("in",29.0),("out",29.35),("in",30.2),("out",30.55)]
 for k,t in BOT: place(sfx,popfx(700,350,0.1) if k=="in" else ding(1760),t,0.45 if k=="in" else 0.3)
-place(sfx,whoosh(0.6,400,5000),31.35,0.4)
+place(sfx,whoosh(0.6,400,5000),W('s4a',12)-0.25,0.4)
 for i in range(4): place(sfx,ding(2093 if i%2 else 1760),31.9+i*0.55,0.25)
-place(sfx,popfx(900,300,0.15),32.85,0.55)
+place(sfx,popfx(900,300,0.15),W('s4a',15)-0.1,0.55)
 place(sfx,whoosh(0.6,400,5000),35.15,0.4)
 t247=W('s4b',3); place(sfx,impact(),t247-0.15,0.35); place(sfx,whoosh(1.4,500,6000),t247,0.25)
 hpT=W('s4b',5)
@@ -193,7 +193,7 @@ sfx=reverb(sfx,1.0,0.15)
 # ================= VOICE
 vo=bus()
 for k,sg in SEG.items():
-    raw=subprocess.check_output(["ffmpeg","-v","error","-i",f"{S}/vo/{k}.mp3","-f","f32le","-ac","1","-ar",str(SR),"-"])
+    raw=subprocess.check_output(["ffmpeg","-v","error","-i",f"{S}/vo/{k}.wav","-f","f32le","-ac","1","-ar",str(SR),"-"])
     x=np.frombuffer(raw,np.float32).astype(float)
     x=hp(x,90); x=x/np.max(np.abs(x))*0.9
     place(vo,x,sg["start"],1.0)

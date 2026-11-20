@@ -13,7 +13,7 @@ def disp(w):
 merges = [(["Ay-Si-Pi","Ay-Ti"], "ICP IT"), (["yigirma","to'rt","soat,","yetti","kun"], "24/7")]
 segs = []
 for k, st in starts.items():
-    f = f"{S}/vo/{k}.mp3"
+    f = f"{S}/vo/{k}.wav"
     txt = open(f+".srt").read().strip().split("\n\n")
     words = []
     for b in txt:

@@ -258,7 +258,7 @@ const W=(id,i)=>SEG[id].words[i].a;
 const noise=(i)=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x);};
 
 // ---------- scene boundaries ----------
-const T1=[0,4.95], T2=[4.95,15.95], T3=[15.95,23.9], T4S=[23.9,25.75], T4C=[25.75,31.55], T4R=[31.55,35.35], T4F=[35.35,47.3], T5=[47.3,58.75], T6=[58.75,TL.end];
+const T1=[0,4.95], T2=[4.95,15.95], T3=[15.95,23.9], T4S=[23.9,25.75], T4C=[25.75,W('s4a',12)-0.05], T4R=[W('s4a',12)-0.05,35.35], T4F=[35.35,47.3], T5=[47.3,58.75], T6=[58.75,TL.end];
 
 // ---------- dots ----------
 const dots=[]; for(let i=0;i<26;i++){const d=document.createElement('div');d.className='dot';$('dots').appendChild(d);dots.push(d);}
@@ -513,7 +513,7 @@ function render(t){
     ['st1','st2'].forEach((id,k)=>{const e=$(id);const p=((t*0.8+k*0.5)%1);e.setAttribute('transform',`translate(0 ${-p*40})`);e.style.opacity=Math.sin(p*Math.PI);});
     const cup=$('cup'); const sip=Math.max(0,Math.sin((t-31.6)*1.6)); cup.setAttribute('transform',`translate(0 ${-sip*16}) rotate(${-sip*6} 366 610)`);
     chk.forEach(c=>{const p=pop(t,c.t,.35);const life=P(t,c.t,c.t+2.2);tf(c.d,{x:c.x,y:c.y-life*120,s:p,op:fin(t,c.t,.1)*(1-P(t,c.t+1.6,c.t+2.2))});});
-    tf($('installBtn'),{s:pop(t,32.85,.5)*(1+0.04*Math.sin(t*8)),op:fin(t,32.85,.15)});
+    const ib=W('s4a',15)-0.1; tf($('installBtn'),{s:pop(t,ib,.5)*(1+0.04*Math.sin(t*8)),op:fin(t,ib,.15)});
    }}
 
   // ======= SCENE 4 FEATURES =======
